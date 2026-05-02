@@ -9,17 +9,33 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "config": {
+        "googleMapsApiKey": "AIzaSyCEU65uTqOUVmi7VxEBDnt7FItrqBXE1Io"
+      }
+    },
+    "infoPlist": {
+      "NSAppTransportSecurity": {
+        "NSAllowsArbitraryLoads": true
+      }
     },
     "android": {
+      "usesCleartextTraffic": true,
+      "softwareKeyboardLayoutMode": "pan",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "edgeToEdgeEnabled": false,
+      "predictiveBackGestureEnabled": false,
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyCEU65uTqOUVmi7VxEBDnt7FItrqBXE1Io"
+        }
+      },
+      "package": "com.afyasmart"
     },
     "web": {
       "output": "static",
@@ -43,6 +59,12 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "44ddf929-be77-4c0d-ae8a-4a2538be68fa"
+      }
     }
   }
 }

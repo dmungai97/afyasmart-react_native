@@ -1,24 +1,28 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { Stack } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import 'react-native-reanimated';
-
-import { useColorScheme } from '@/hooks/use-color-scheme';
-
-export const unstable_settings = {
-  anchor: '(tabs)',
-};
+import { useEffect, useState } from 'react';
+import { Slot, useRouter, useSegments } from 'expo-router';
+import { useAuthStore } from '../src/store/authStore';
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
+  const token = useAuthStore((state) => state.token);
+  const loadAuth = useAuthStore((state) => state.loadAuth);
+  const segments = useSegments();
+  const router = useRouter();
+  const [authLoaded, setAuthLoaded] = useState(false);
 
-  return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-      </Stack>
-      <StatusBar style="auto" />
-    </ThemeProvider>
-  );
+  useEffect(() => {
+    loadAuth().then(() => setAuthLoaded(true));
+  }, [loadAuth]);
+
+  useEffect(() => {
+    if (!authLoaded) return;
+    if ((segments as string[]).length === 0) return;
+
+    const inAuthGroup = (segments[0] as string) === '(auth)';
+
+    if (!token && !inAuthGroup) {
+      router.replace('/(auth)/login' as any);
+    }
+  }, [authLoaded, token, segments, router]);
+
+  return <Slot />;
 }
