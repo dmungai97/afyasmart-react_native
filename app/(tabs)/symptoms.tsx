@@ -1,14 +1,12 @@
-import { useState, useRef } from 'react';
+import { useState} from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  ScrollView, TextInput, Animated, ActivityIndicator,
-  Easing,
+  ScrollView, TextInput, ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 
 const TEAL   = '#0B6E6E';
-const TEAL2  = '#0D8080';
 const GREEN  = '#16A34A';
 const RED    = '#DC2626';
 const ORANGE = '#D97706';
@@ -602,24 +600,61 @@ export default function SymptomsScreen() {
           <Text style={styles.resultsSub}>These are possible causes, not a diagnosis.</Text>
 
           {/* Conditions */}
+          {/* Conditions — Locked */}
           <View style={styles.conditionsCard}>
             <View style={styles.conditionsHeader}>
               <Text style={styles.conditionsTitle}>Possible conditions</Text>
               <Ionicons name="information-circle-outline" size={16} color="#888" />
             </View>
-            {results.map((c, i) => (
-              <View key={i} style={styles.conditionRow}>
-                <View style={[styles.conditionDot, { backgroundColor: c.color }]} />
-                <View style={styles.conditionInfo}>
-                  <Text style={styles.conditionName}>{c.name}</Text>
-                  <Text style={styles.conditionLikelihood}>{c.likelihood} likelihood</Text>
+
+            {/* First result visible */}
+            <View style={styles.conditionRow}>
+              <View style={[styles.conditionDot, { backgroundColor: results[0]?.color ?? RED }]} />
+              <View style={styles.conditionInfo}>
+                <Text style={styles.conditionName}>{results[0]?.name ?? 'Condition 1'}</Text>
+                <Text style={styles.conditionLikelihood}>{results[0]?.likelihood} likelihood</Text>
+              </View>
+              <Text style={[styles.conditionPercent, { color: results[0]?.color ?? RED }]}>
+                {results[0]?.percent}%
+              </Text>
+            </View>
+
+            {/* Locked results */}
+            {[1, 2].map((i) => (
+              <View key={i} style={styles.conditionRowLocked}>
+                <View style={styles.conditionDotLocked} />
+                <View style={styles.conditionInfoLocked}>
+                  <View style={styles.lockedBar} />
+                  <View style={[styles.lockedBar, { width: 80 }]} />
                 </View>
-                <Text style={[styles.conditionPercent, { color: c.color }]}>{c.percent}%</Text>
+                <Ionicons name="lock-closed" size={18} color="#ccc" />
               </View>
             ))}
-            <Text style={styles.conditionDisclaimer}>
-              Consult a healthcare professional for proper diagnosis.
-            </Text>
+
+            {/* Unlock CTA */}
+            <TouchableOpacity
+              style={styles.unlockCta}
+              onPress={() => router.push('/(tabs)/subscription' as any)}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="lock-open-outline" size={16} color="#fff" />
+              <Text style={styles.unlockCtaText}>Unlock Full Results</Text>
+            </TouchableOpacity>
+
+            {/* Teaser list */}
+            <View style={styles.unlockTeaser}>
+              {[
+                'Detailed condition analysis',
+                'Recommended medication',
+                'Nearby doctors & pharmacies',
+                'AI follow-up chat',
+              ].map((t, i) => (
+                <View key={i} style={styles.teaserRow}>
+                  <Ionicons name="checkmark-circle" size={14} color={GREEN} />
+                  <Text style={styles.teaserText}>{t}</Text>
+                </View>
+              ))}
+            </View>
           </View>
 
           {/* What to do */}
@@ -1077,4 +1112,30 @@ const styles = StyleSheet.create({
     padding: 14, borderWidth: 0.5, borderColor: 'rgba(11,110,110,0.2)',
   },
   historyTipText: { fontSize: 13, color: TEAL, flex: 1, lineHeight: 20 },
+
+  conditionRowLocked: {
+  flexDirection: 'row', alignItems: 'center',
+  gap: 10, paddingVertical: 12,
+  borderTopWidth: 0.5, borderTopColor: '#F3F4F6',
+},
+conditionDotLocked: {
+  width: 10, height: 10, borderRadius: 5,
+  backgroundColor: '#E5E7EB',
+},
+conditionInfoLocked: { flex: 1, gap: 6 },
+lockedBar: {
+  height: 10, width: 120,
+  backgroundColor: '#F3F4F6',
+  borderRadius: 5,
+},
+unlockCta: {
+  backgroundColor: TEAL,
+  borderRadius: 12, paddingVertical: 13,
+  flexDirection: 'row', alignItems: 'center',
+  justifyContent: 'center', gap: 8, marginTop: 16,
+},
+unlockCtaText: { color: '#fff', fontSize: 15, fontWeight: '800' },
+unlockTeaser: { marginTop: 14, gap: 8 },
+teaserRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+teaserText: { fontSize: 13, color: '#555' },
 });

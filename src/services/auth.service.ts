@@ -7,6 +7,9 @@ export interface AuthUser {
   name: string;
   email: string;
   phone?: string;
+  is_subscribed: boolean;
+  chat_count: number;
+  subscription_expires_at: string | null;
 }
 
 export interface AuthResponse {
