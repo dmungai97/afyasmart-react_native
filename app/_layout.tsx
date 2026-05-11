@@ -3,11 +3,12 @@ import { Slot, useRouter, useSegments } from 'expo-router';
 import { useAuthStore } from '../src/store/authStore';
 
 export default function RootLayout() {
-  const token = useAuthStore((state) => state.token);
-  const hasCompletedOnboarding = useAuthStore((state) => state.hasCompletedOnboarding);
-  const loadAuth = useAuthStore((state) => state.loadAuth);
-  const segments = useSegments();
-  const router = useRouter();
+  const token                  = useAuthStore((s) => s.token);
+  const user                   = useAuthStore((s) => s.user);
+  const hasCompletedOnboarding = useAuthStore((s) => s.hasCompletedOnboarding);
+  const loadAuth               = useAuthStore((s) => s.loadAuth);
+  const segments               = useSegments();
+  const router                 = useRouter();
   const [authLoaded, setAuthLoaded] = useState(false);
 
   useEffect(() => {
@@ -17,34 +18,36 @@ export default function RootLayout() {
   useEffect(() => {
     if (!authLoaded) return;
 
-    const seg = segments as string[];
+    const seg  = segments as string[];
     const first = seg[0] ?? '';
 
-    const inAuthGroup       = first === '(auth)';
-    const inOnboardingGroup = first === '(onboarding)';
-    const inTabsGroup       = first === '(tabs)';
-    const onWelcome         = first === 'index' || first === '';
+    const inAuth       = first === '(auth)';
+    const inOnboarding = first === '(onboarding)';
+    const inTabs       = first === '(tabs)';
+    const onRoot       = first === 'index' || first === '';
 
-    // Already in the right place — do nothing
-    if (inTabsGroup) return;
-
+    // ── Not logged in ──────────────────────────────────────────
     if (!token) {
-      // Not logged in — send to welcome
-      if (!inAuthGroup && !onWelcome) {
-        router.replace('/');
-      }
-    } else if (!hasCompletedOnboarding) {
-      // Logged in but onboarding pending
-      if (!inOnboardingGroup) {
-        router.replace('/(onboarding)/step1' as any);
-      }
-    } else {
-      // Fully set up — send to symptoms (first screen of main app)
-      if (!inTabsGroup) {
-        if (!inTabsGroup) router.replace('/(tabs)' as any);
-      }
+      if (!inAuth && !onRoot) router.replace('/');
+      return;
     }
-  }, [authLoaded, token, hasCompletedOnboarding, segments, router]);
+
+    // ── Logged in + subscribed → full app ──────────────────────
+    if (user?.is_subscribed) {
+      if (!inTabs) router.replace('/(tabs)' as any);
+      return;
+    }
+
+    // ── Logged in, NOT subscribed ──────────────────────────────
+    if (!hasCompletedOnboarding) {
+      // First time — show welcome funnel
+      if (!inOnboarding) router.replace('/(onboarding)/welcome' as any);
+    } else {
+      // Returning unsubscribed user — drop into symptom chat teaser
+      if (!inOnboarding) router.replace('/(onboarding)/symptom-chat' as any);
+    }
+
+  }, [authLoaded, token, user, hasCompletedOnboarding, segments, router]);
 
   return <Slot />;
 }

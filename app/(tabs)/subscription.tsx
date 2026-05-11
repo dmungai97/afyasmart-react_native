@@ -214,10 +214,10 @@ if (pollRef.current !== null) clearInterval(pollRef.current);
     setPollCount(0);
   };
 
-  const handleDone = () => {
-    setShowSuccess(false);
-    router.replace('/(tabs)/chat');
-  };
+const handleDone = () => {
+  setShowSuccess(false);
+  router.replace('/(tabs)' as any);
+};
 
   // ── Payment modal content by step ─────────────────────────────
   const renderPaymentContent = () => {

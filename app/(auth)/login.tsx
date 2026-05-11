@@ -32,35 +32,37 @@ export default function LoginScreen() {
 
   const isSubmitting = useRef(false);
 
-  const handleLogin = async () => {
-    if (!email || !password) {
-      alert('Please enter email and password');
-      return;
-    }
+const handleLogin = async () => {
+  if (!email || !password) {
+    alert('Please enter email and password');
+    return;
+  }
 
-    if (isSubmitting.current) return;
+  if (isSubmitting.current) return;
+  isSubmitting.current = true;
+  setLoading(true);
 
-    isSubmitting.current = true;
-    setLoading(true);
+  try {
+    const data = await loginUser(email, password);
 
-    try {
-      const data = await loginUser(email, password);
+    // Set auth — _layout.tsx will route based on is_subscribed
+    await setAuth(data.token, data.user, false);
 
-      await setAuth(data.token, data.user, false);
+    // Only mark onboarding done for already-subscribed users
+    if (data.user.is_subscribed) {
       await completeOnboarding();
-
-      router.replace('/(tabs)' as any);
-    } catch (error: any) {
-      const message =
-        error?.response?.data?.message ||
-        'Login failed. Please try again.';
-
-      alert(message);
-    } finally {
-      setLoading(false);
-      isSubmitting.current = false;
     }
-  };
+
+  } catch (error: any) {
+    const message =
+      error?.response?.data?.message ||
+      'Login failed. Please try again.';
+    alert(message);
+  } finally {
+    setLoading(false);
+    isSubmitting.current = false;
+  }
+};
 
   return (
     <KeyboardAvoidingView
