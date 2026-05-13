@@ -1,0 +1,17 @@
+{
+  "expo": {
+    "name": "AfyaSmart",
+    "slug": "afyasmart",
+    "scheme": "afyasmart",
+    "android": {
+      "softwareKeyboardLayoutMode": "resize",
+      "package": "com.afyasmart.app"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "bbf76662-aebe-40e3-8aff-2f9e3a7eec95"
+      }
+    },
+    "owner": "dmungai97"
+  }
+}

@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../../src/store/authStore';
@@ -14,9 +15,16 @@ type MenuItem = {
 };
 
 export default function ProfileScreen() {
-  const user      = useAuthStore((state) => state.user);
-  const clearAuth = useAuthStore((state) => state.clearAuth);
-  const router    = useRouter();
+  const user        = useAuthStore((state) => state.user);
+  const clearAuth   = useAuthStore((state) => state.clearAuth);
+  const refreshUser = useAuthStore((state) => state.refreshUser);
+  const token       = useAuthStore((state) => state.token);
+  const router      = useRouter();
+
+  // Refresh user on mount so subscription status is always current
+  useEffect(() => {
+    if (token) refreshUser(token);
+  }, []);
 
   const handleLogout = () => {
     Alert.alert(
@@ -54,11 +62,12 @@ export default function ProfileScreen() {
     {
       title: 'Health',
       items: [
-        { icon: 'document-text-outline', label: 'Medical History',    sub: 'Your health records' },
+        { icon: 'document-text-outline', label: 'Medical History', sub: 'Your health records' },
         {
           icon: 'card-outline',
           label: 'Subscription Plan',
-          sub: 'Free plan · Upgrade',
+          // Dynamic status text
+          sub: user?.is_subscribed ? ' Active · Manage plan' : '⚪ Free plan · Upgrade',
           onPress: () => router.push('/(tabs)/subscription' as any),
         },
         { icon: 'receipt-outline', label: 'Payment History', sub: 'View transactions' },
@@ -67,10 +76,10 @@ export default function ProfileScreen() {
     {
       title: 'Support',
       items: [
-        { icon: 'help-circle-outline',      label: 'Help & Support',      sub: 'Get assistance' },
-        { icon: 'shield-checkmark-outline', label: 'Privacy Policy',      sub: 'How we use your data' },
-        { icon: 'document-outline',         label: 'Terms & Conditions',  sub: 'Read our terms' },
-        { icon: 'star-outline',             label: 'Rate AfyaSmart',       sub: 'Share your feedback' },
+        { icon: 'help-circle-outline',      label: 'Help & Support',     sub: 'Get assistance' },
+        { icon: 'shield-checkmark-outline', label: 'Privacy Policy',     sub: 'How we use your data' },
+        { icon: 'document-outline',         label: 'Terms & Conditions', sub: 'Read our terms' },
+        { icon: 'star-outline',             label: 'Rate AfyaSmart',      sub: 'Share your feedback' },
       ],
     },
   ];
@@ -112,26 +121,40 @@ export default function ProfileScreen() {
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
-            <Text style={styles.statNumber}>Free</Text>
+            {/* Dynamic subscription status */}
+            <View style={styles.planStatusRow}>
+              <View style={[
+                styles.planDot,
+                { backgroundColor: user?.is_subscribed ? '#16A34A' : '#9ca3af' }
+              ]} />
+              <Text style={[
+                styles.statNumber,
+                { color: user?.is_subscribed ? '#16A34A' : '#1a1a1a', fontSize: 14 }
+              ]}>
+                {user?.is_subscribed ? 'Active' : 'Free'}
+              </Text>
+            </View>
             <Text style={styles.statLabel}>Current Plan</Text>
           </View>
         </View>
       </View>
 
-      {/* Upgrade banner */}
-      <TouchableOpacity
-        style={styles.upgradeBanner}
-        onPress={() => router.push('/(tabs)/subscription' as any)}
-      >
-        <View style={styles.upgradeIcon}>
-          <Ionicons name="diamond-outline" size={20} color={TEAL} />
-        </View>
-        <View style={styles.upgradeText}>
-          <Text style={styles.upgradeTitle}>Upgrade to Premium</Text>
-          <Text style={styles.upgradeSub}>AI chat, unlimited consultations & more</Text>
-        </View>
-        <Ionicons name="chevron-forward" size={18} color={TEAL} />
-      </TouchableOpacity>
+      {/* Upgrade banner — hidden for subscribed users */}
+      {!user?.is_subscribed && (
+        <TouchableOpacity
+          style={styles.upgradeBanner}
+          onPress={() => router.push('/(tabs)/subscription' as any)}
+        >
+          <View style={styles.upgradeIcon}>
+            <Ionicons name="diamond-outline" size={20} color={TEAL} />
+          </View>
+          <View style={styles.upgradeText}>
+            <Text style={styles.upgradeTitle}>Upgrade to Premium</Text>
+            <Text style={styles.upgradeSub}>AI chat, unlimited consultations & more</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={TEAL} />
+        </TouchableOpacity>
+      )}
 
       {/* Menu sections */}
       {menuSections.map((section, si) => (
@@ -235,6 +258,19 @@ const styles = StyleSheet.create({
   statDivider: { width: 0.5, backgroundColor: '#e8e8e8' },
   statNumber:  { fontSize: 18, fontWeight: '700', color: '#1a1a1a', marginBottom: 2 },
   statLabel:   { fontSize: 11, color: '#888' },
+
+  // New styles for plan status
+  planStatusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginBottom: 2,
+  },
+  planDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
 
   upgradeBanner: {
     backgroundColor: 'rgba(11,110,110,0.06)',

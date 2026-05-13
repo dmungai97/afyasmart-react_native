@@ -1,13 +1,12 @@
 import { useEffect, useRef } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  StatusBar, Animated, Dimensions,
+  StatusBar, Animated,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../../src/store/authStore';
 
-const { width } = Dimensions.get('window');
 const TEAL      = '#0B6E6E';
 const TEAL_DARK = '#063D3D';
 
@@ -20,7 +19,7 @@ const FEATURES = [
 
 export default function WelcomeScreen() {
   const router           = useRouter();
-  const completeOnboarding = useAuthStore((s) => s.completeOnboarding);
+  const token            = useAuthStore((s) => s.token);
 
   // ── Animations ────────────────────────────────────────────────
   const fadeAnim    = useRef(new Animated.Value(0)).current;
@@ -46,13 +45,12 @@ export default function WelcomeScreen() {
   }, []);
 
   const handleStart = async () => {
-    router.push('/(onboarding)/health-check' as any);
-  };
+    if (!token) {
+      router.push('/(auth)/register' as any);
+      return;
+    }
 
-  const handleSkip = async () => {
-    // Mark onboarding done, go straight to teaser chat on next visit
-    await completeOnboarding();
-    router.replace('/(onboarding)/symptom-chat' as any);
+    router.push('/(onboarding)/health-check' as any);
   };
 
   return (
@@ -64,11 +62,6 @@ export default function WelcomeScreen() {
         <View style={[styles.circle, { width: 300, height: 300, top: -100, right: -80, opacity: 0.1 }]} />
         <View style={[styles.circle, { width: 180, height: 180, top: 80,   left: -60, opacity: 0.07 }]} />
       </View>
-
-      {/* ── Skip ── */}
-      <TouchableOpacity style={styles.skipBtn} onPress={handleSkip}>
-        <Text style={styles.skipText}>Skip</Text>
-      </TouchableOpacity>
 
       {/* ── Logo ── */}
       <Animated.View style={[styles.logoSection, { opacity: fadeAnim, transform: [{ scale: scaleAnim }] }]}>
@@ -135,13 +128,6 @@ export default function WelcomeScreen() {
         </Text>
       </Animated.View>
 
-      {/* ── Pricing hint — no pressure ── */}
-      <Animated.View style={[styles.pricingHint, { opacity: fadeAnim }]}>
-        <Text style={styles.pricingHintText}>
-          Full access from <Text style={styles.pricingHintAccent}>Ksh 20/day</Text>
-        </Text>
-      </Animated.View>
-
     </View>
   );
 }
@@ -158,10 +144,6 @@ const styles = StyleSheet.create({
   // Background decoration
   bgTop:  { ...StyleSheet.absoluteFillObject },
   circle: { position: 'absolute', borderRadius: 999, backgroundColor: '#fff' },
-
-  // Skip
-  skipBtn: { position: 'absolute', top: 56, right: 24 },
-  skipText: { color: 'rgba(255,255,255,0.5)', fontSize: 14, fontWeight: '500' },
 
   // Logo
   logoSection: { alignItems: 'center', marginBottom: 28 },
@@ -231,8 +213,4 @@ const styles = StyleSheet.create({
   ctaBtnText: { color: '#063D3D', fontSize: 17, fontWeight: '900' },
   ctaNote:    { color: 'rgba(255,255,255,0.45)', fontSize: 12, textAlign: 'center' },
 
-  // Pricing hint
-  pricingHint: { position: 'absolute', bottom: 36 },
-  pricingHintText:   { color: 'rgba(255,255,255,0.4)', fontSize: 12, textAlign: 'center' },
-  pricingHintAccent: { color: 'rgba(255,255,255,0.7)', fontWeight: '700' },
 });

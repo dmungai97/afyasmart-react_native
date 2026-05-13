@@ -106,7 +106,7 @@ export default function SubscriptionScreen() {
   // CORRECT
 const [checkoutId, setCheckoutId] = useState<string | null>(null);
   const [pollCount,     setPollCount]         = useState(0);
-  const pollRef = useRef<number | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Auto-open payment modal when navigated from chat
   useEffect(() => {
@@ -216,7 +216,7 @@ if (pollRef.current !== null) clearInterval(pollRef.current);
 
 const handleDone = () => {
   setShowSuccess(false);
-  router.replace('/(tabs)' as any);
+  router.replace('/(tabs)/diagnosis-results' as any);
 };
 
   // ── Payment modal content by step ─────────────────────────────
@@ -227,9 +227,10 @@ const handleDone = () => {
     if (payStep === 'form') {
       return (
         <>
-          <Text style={styles.secureLabel}>🔒 Secure M-Pesa Payment</Text>
+          <Text style={styles.secureLabel}>Your first diagnosis is already prepared</Text>
 
           <View style={styles.amountCard}>
+            <Text style={styles.amountHook}>You&apos;re 1 step away</Text>
             <Text style={styles.amountLabel}>Amount to pay</Text>
             <Text style={styles.amountValue}>Ksh {selectedPlan.price}</Text>
             <Text style={styles.amountPlan}>{selectedPlan.name}</Text>
@@ -556,6 +557,7 @@ const styles = StyleSheet.create({
     alignItems: 'center', borderWidth: 0.5, borderColor: '#E5E7EB',
   },
   amountLabel: { fontSize: 12, color: '#888', marginBottom: 6 },
+  amountHook: { fontSize: 13, color: TEAL, fontWeight: '800', marginBottom: 8 },
   amountValue: { fontSize: 36, fontWeight: '900', color: '#1a1a1a', marginBottom: 4 },
   amountPlan:  { fontSize: 13, color: '#888' },
 

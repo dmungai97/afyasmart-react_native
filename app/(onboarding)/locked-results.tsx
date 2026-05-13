@@ -1,12 +1,12 @@
 import { useEffect, useRef } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  StatusBar, Animated, ScrollView, Dimensions,
+  StatusBar, Animated, ScrollView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useDiagnosisStore } from '../../src/store/diagnosisStore';
 
-const { width }  = Dimensions.get('window');
 const TEAL       = '#0B6E6E';
 const TEAL_DARK  = '#063D3D';
 const BG         = '#F0F7F7';
@@ -33,6 +33,7 @@ const PLANS = [
 
 export default function LockedResultsScreen() {
   const router = useRouter();
+  const diagnosis = useDiagnosisStore((s) => s.pendingDiagnosis);
 
   // ── Animations ─────────────────────────────────────────────
   const fadeAnim   = useRef(new Animated.Value(0)).current;
@@ -67,10 +68,10 @@ export default function LockedResultsScreen() {
     }, 2000);
   }, []);
 
-  const handleSubscribe = (plan: string) => {
+  const handleSubscribe = (planId: string) => {
     router.push({
       pathname: '/(tabs)/subscription' as any,
-      params: { plan },
+      params: { plan: planId },
     });
   };
 
@@ -89,7 +90,7 @@ export default function LockedResultsScreen() {
           </Animated.View>
           <Text style={styles.bannerTitle}>Analysis Complete ✅</Text>
           <Text style={styles.bannerSub}>
-            We found <Text style={styles.bannerHighlight}>3 possible conditions</Text> related to your symptoms
+            We found <Text style={styles.bannerHighlight}>{diagnosis?.conditions.length ?? 3} possible conditions</Text> related to your symptoms
           </Text>
         </Animated.View>
 

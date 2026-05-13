@@ -7,6 +7,7 @@ import {
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../../src/store/authStore';
+import { buildDiagnosisFromSymptoms, useDiagnosisStore } from '../../src/store/diagnosisStore';
 import api from '../../src/services/api';
 
 const TEAL      = '#0B6E6E';
@@ -29,6 +30,7 @@ const INITIAL_MESSAGES: Message[] = [
 export default function SymptomChatScreen() {
   const router = useRouter();
   const token  = useAuthStore((s) => s.token);
+  const setPendingDiagnosis = useDiagnosisStore((s) => s.setPendingDiagnosis);
 
   const [messages, setMessages]   = useState<Message[]>(INITIAL_MESSAGES);
   const [input, setInput]         = useState('');
@@ -72,6 +74,7 @@ export default function SymptomChatScreen() {
 
     setInput('');
     setHasSymptoms(true);
+    setPendingDiagnosis(buildDiagnosisFromSymptoms(text));
 
     // Add user message
     setMessages((prev) => [...prev, { role: 'user', text }]);

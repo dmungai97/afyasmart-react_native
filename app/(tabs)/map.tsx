@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
   ActivityIndicator, Platform, Linking, FlatList, ScrollView
@@ -12,7 +12,7 @@ const RED   = '#DC2626';
 const GREEN = '#16A34A';
 
 type Centre = {
-  id: number;
+  id: number | string;
   name: string;
   type: 'Hospital' | 'Pharmacy' | 'Clinic' | 'Doctor';
   lat: number;
@@ -20,19 +20,28 @@ type Centre = {
   open: boolean;
   closes: string;
   subscribed?: boolean;
+  source?: 'osm';
 };
 
-// Fallback static centres (Nakuru area)
-const STATIC_CENTRES: Centre[] = [
-  { id: 1, name: 'Nakuru Level 5 Hospital',        type: 'Hospital',  lat: -0.2833, lng: 36.0667, open: true,  closes: '24/7',     subscribed: true },
-  { id: 2, name: 'Rift Valley Provincial Hospital', type: 'Hospital',  lat: -0.2956, lng: 36.0731, open: true,  closes: '24/7',     subscribed: true },
-  { id: 3, name: 'Goodlife Pharmacy',               type: 'Pharmacy',  lat: -0.2701, lng: 36.0598, open: true,  closes: '9:00 PM',  subscribed: true },
-  { id: 4, name: 'Flamingo Health Clinic',          type: 'Clinic',    lat: -0.3012, lng: 36.0812, open: false, closes: '5:00 PM'  },
-  { id: 5, name: 'Milimani Medical Centre',         type: 'Clinic',    lat: -0.2889, lng: 36.0521, open: true,  closes: '8:00 PM'  },
-  { id: 6, name: 'Nakuru War Memorial Hospital',    type: 'Hospital',  lat: -0.2775, lng: 36.0743, open: true,  closes: '24/7',     subscribed: true },
-  { id: 7, name: 'Dr. Mary Wanjiku',                type: 'Doctor',    lat: -0.2920, lng: 36.0680, open: true,  closes: '5:00 PM'  },
-  { id: 8, name: 'Nairobi West Hospital',           type: 'Hospital',  lat: -0.2650, lng: 36.0550, open: true,  closes: '24/7'     },
-];
+type OsmElement = {
+  type: string;
+  id: number;
+  lat?: number;
+  lon?: number;
+  center?: {
+    lat: number;
+    lon: number;
+  };
+  tags?: Record<string, string>;
+};
+
+type NominatimPlace = {
+  place_id: number;
+  display_name: string;
+  lat: string;
+  lon: string;
+  type?: string;
+};
 
 const TYPE_CONFIG: Record<string, { color: string; bg: string; icon: keyof typeof Ionicons.glyphMap }> = {
   Hospital: { color: TEAL,     bg: '#E6F4F4', icon: 'business-outline' },
@@ -41,7 +50,13 @@ const TYPE_CONFIG: Record<string, { color: string; bg: string; icon: keyof typeo
   Doctor:   { color: '#7C3AED', bg: '#F5F3FF', icon: 'person-outline' },
 };
 
-const FILTER_TABS = ['All', 'Pharmacies', 'Doctors', 'Hospitals'];
+const FILTER_TABS = ['Care', 'Hospitals', 'Clinics', 'All', 'Pharmacies', 'Doctors'];
+
+const SEARCH_RADIUS_METRES = 25000;
+const OVERPASS_ENDPOINTS = [
+  'https://overpass-api.de/api/interpreter',
+  'https://overpass.kumi.systems/api/interpreter',
+];
 
 function getDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 6371;
@@ -53,24 +68,182 @@ function getDistance(lat1: number, lng1: number, lat2: number, lng2: number): nu
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+function classifyCentre(tags: Record<string, string> = {}): Centre['type'] {
+  const value = `${tags.amenity ?? ''} ${tags.healthcare ?? ''}`.toLowerCase();
+
+  if (value.includes('pharmacy')) return 'Pharmacy';
+  if (value.includes('doctor')) return 'Doctor';
+  if (value.includes('clinic')) return 'Clinic';
+  return 'Hospital';
+}
+
+function centreName(tags: Record<string, string> = {}, type: Centre['type']) {
+  return tags.name || tags['official_name'] || tags['operator'] || `Nearby ${type}`;
+}
+
+async function fetchNearbyHealthCentres(
+  coords: { latitude: number; longitude: number }
+): Promise<Centre[]> {
+  const { latitude, longitude } = coords;
+  const query = `
+    [out:json][timeout:12];
+    (
+      node["amenity"~"hospital|clinic|doctors|pharmacy"](around:${SEARCH_RADIUS_METRES},${latitude},${longitude});
+      way["amenity"~"hospital|clinic|doctors|pharmacy"](around:${SEARCH_RADIUS_METRES},${latitude},${longitude});
+      relation["amenity"~"hospital|clinic|doctors|pharmacy"](around:${SEARCH_RADIUS_METRES},${latitude},${longitude});
+      node["healthcare"~"hospital|clinic|doctor|pharmacy"](around:${SEARCH_RADIUS_METRES},${latitude},${longitude});
+      way["healthcare"~"hospital|clinic|doctor|pharmacy"](around:${SEARCH_RADIUS_METRES},${latitude},${longitude});
+      relation["healthcare"~"hospital|clinic|doctor|pharmacy"](around:${SEARCH_RADIUS_METRES},${latitude},${longitude});
+    );
+    out center tags;
+  `;
+
+  let data: { elements?: OsmElement[] } | null = null;
+
+  for (const endpoint of OVERPASS_ENDPOINTS) {
+    try {
+      let response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+        body: `data=${encodeURIComponent(query)}`,
+      });
+
+      if (!response.ok) {
+        response = await fetch(`${endpoint}?data=${encodeURIComponent(query)}`);
+      }
+
+      if (response.ok) {
+        data = await response.json();
+        break;
+      }
+    } catch {
+      // Try the next public Overpass endpoint.
+    }
+  }
+
+  if (!data) {
+    throw new Error('Could not load nearby health centres');
+  }
+
+  const seen = new Set<string>();
+
+  return (data.elements ?? [])
+    .map<Centre | null>((element) => {
+      const lat = element.lat ?? element.center?.lat;
+      const lng = element.lon ?? element.center?.lon;
+
+      if (lat == null || lng == null) return null;
+
+      const tags = element.tags ?? {};
+      const type = classifyCentre(tags);
+      const name = centreName(tags, type);
+      const key = `${name.toLowerCase()}-${lat.toFixed(4)}-${lng.toFixed(4)}`;
+
+      if (seen.has(key)) return null;
+      seen.add(key);
+
+      return {
+        id: `osm-${element.type}-${element.id}`,
+        name,
+        type,
+        lat,
+        lng,
+        open: true,
+        closes: tags.opening_hours ?? 'Hours vary',
+        source: 'osm' as const,
+      };
+    })
+    .filter((centre): centre is Centre => Boolean(centre));
+}
+
+async function fetchNominatimHealthCentres(
+  coords: { latitude: number; longitude: number }
+): Promise<Centre[]> {
+  const { latitude, longitude } = coords;
+  const latSpan = 0.18;
+  const lngSpan = 0.18;
+  const viewbox = [
+    longitude - lngSpan,
+    latitude + latSpan,
+    longitude + lngSpan,
+    latitude - latSpan,
+  ].join(',');
+  const searches = [
+    { query: 'hospital', type: 'Hospital' as const },
+    { query: 'clinic', type: 'Clinic' as const },
+  ];
+  const seen = new Set<string>();
+  const centres: Centre[] = [];
+
+  for (const search of searches) {
+    try {
+      const params = new URLSearchParams({
+        q: search.query,
+        format: 'json',
+        limit: '25',
+        bounded: '1',
+        viewbox,
+        addressdetails: '0',
+      });
+      const response = await fetch(`https://nominatim.openstreetmap.org/search?${params.toString()}`, {
+        headers: {
+          'Accept-Language': 'en',
+        },
+      });
+
+      if (!response.ok) continue;
+
+      const places: NominatimPlace[] = await response.json();
+
+      for (const place of places) {
+        const lat = Number(place.lat);
+        const lng = Number(place.lon);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+
+        const name = place.display_name.split(',')[0]?.trim() || `Nearby ${search.type}`;
+        const key = `${name.toLowerCase()}-${lat.toFixed(4)}-${lng.toFixed(4)}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+
+        centres.push({
+          id: `nominatim-${place.place_id}`,
+          name,
+          type: search.type,
+          lat,
+          lng,
+          open: true,
+          closes: 'Hours vary',
+          source: 'osm',
+        });
+      }
+    } catch {
+      // Continue with the next search term.
+    }
+  }
+
+  return centres;
+}
+
 export default function MapScreen() {
   const mapRef = useRef<MapView>(null);
   const [userLocation, setUserLocation]     = useState<{ latitude: number; longitude: number } | null>(null);
   const [centres, setCentres]               = useState<(Centre & { distance?: number })[]>([]);
   const [selected, setSelected]             = useState<Centre | null>(null);
   const [loading, setLoading]               = useState(true);
+  const [loadingLabel, setLoadingLabel]     = useState('Finding centres near you...');
+  const [lookupError, setLookupError]       = useState<string | null>(null);
   const [permissionDenied, setPermissionDenied] = useState(false);
   const [viewMode, setViewMode]             = useState<'map' | 'list'>('map');
-  const [activeFilter, setActiveFilter]     = useState('All');
+  const [activeFilter, setActiveFilter]     = useState('Care');
 
   useEffect(() => {
     (async () => {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
         setPermissionDenied(true);
+        setLookupError('Location permission is off.');
         setLoading(false);
-        // Still show static centres
-        setCentres(STATIC_CENTRES);
+        setCentres([]);
         return;
       }
       try {
@@ -80,8 +253,33 @@ export default function MapScreen() {
         const coords = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
         setUserLocation(coords);
 
-        // Sort centres by distance from user
-        const withDistance = STATIC_CENTRES.map(c => ({
+        setLoadingLabel('Loading nearby hospitals and clinics...');
+
+        let nearbyCentres: Centre[] = [];
+        let nearbyLookupFailed = false;
+        try {
+          nearbyCentres = await fetchNearbyHealthCentres(coords);
+        } catch {
+          nearbyLookupFailed = true;
+          nearbyCentres = [];
+        }
+
+        if (nearbyCentres.length === 0) {
+          const nominatimCentres = await fetchNominatimHealthCentres(coords);
+          nearbyCentres = nominatimCentres;
+        }
+
+        setLookupError(
+          nearbyCentres.length > 0
+            ? null
+            : nearbyLookupFailed
+            ? 'Nearby lookup failed. Check your internet connection and try again.'
+            : nearbyCentres.length === 0
+            ? 'No mapped health centres were found around your current location.'
+            : null
+        );
+
+        const withDistance = nearbyCentres.map(c => ({
           ...c,
           distance: getDistance(coords.latitude, coords.longitude, c.lat, c.lng),
         })).sort((a, b) => a.distance - b.distance);
@@ -90,24 +288,68 @@ export default function MapScreen() {
 
         mapRef.current?.animateToRegion({
           ...coords,
-          latitudeDelta: 0.08,
-          longitudeDelta: 0.08,
+          latitudeDelta: 0.05,
+          longitudeDelta: 0.05,
         }, 1000);
       } catch {
-        setCentres(STATIC_CENTRES);
+        setLookupError('Could not get your current location.');
+        setCentres([]);
       } finally {
         setLoading(false);
       }
     })();
   }, []);
 
-  const filtered = centres.filter(c => {
+  const filtered = useMemo(() => centres.filter(c => {
     if (activeFilter === 'All') return true;
+    if (activeFilter === 'Care') return c.type === 'Hospital' || c.type === 'Clinic';
     if (activeFilter === 'Pharmacies') return c.type === 'Pharmacy';
     if (activeFilter === 'Doctors')    return c.type === 'Doctor';
-    if (activeFilter === 'Hospitals')  return c.type === 'Hospital' || c.type === 'Clinic';
+    if (activeFilter === 'Hospitals')  return c.type === 'Hospital';
+    if (activeFilter === 'Clinics')    return c.type === 'Clinic';
     return true;
-  });
+  }), [activeFilter, centres]);
+
+  useEffect(() => {
+    if (loading || viewMode !== 'map' || filtered.length === 0) return;
+
+    const coordinates = filtered.map((centre) => ({
+      latitude: centre.lat,
+      longitude: centre.lng,
+    }));
+
+    if (userLocation) {
+      coordinates.push(userLocation);
+    }
+
+    setSelected(null);
+
+    if (coordinates.length === 1) {
+      mapRef.current?.animateToRegion({
+        ...coordinates[0],
+        latitudeDelta: 0.04,
+        longitudeDelta: 0.04,
+      }, 600);
+      return;
+    }
+
+    setTimeout(() => {
+      mapRef.current?.fitToCoordinates(coordinates, {
+        edgePadding: { top: 80, right: 60, bottom: 170, left: 60 },
+        animated: true,
+      });
+    }, 250);
+  }, [filtered, loading, userLocation, viewMode]);
+
+  const getFilterCount = (tab: string) => {
+    if (tab === 'All') return centres.length;
+    if (tab === 'Care') return centres.filter(c => c.type === 'Hospital' || c.type === 'Clinic').length;
+    if (tab === 'Pharmacies') return centres.filter(c => c.type === 'Pharmacy').length;
+    if (tab === 'Doctors') return centres.filter(c => c.type === 'Doctor').length;
+    if (tab === 'Hospitals') return centres.filter(c => c.type === 'Hospital').length;
+    if (tab === 'Clinics') return centres.filter(c => c.type === 'Clinic').length;
+    return 0;
+  };
 
   const handleDirections = (centre: Centre) => {
     const url = Platform.select({
@@ -152,7 +394,11 @@ export default function MapScreen() {
           <View>
             <Text style={styles.headerTitle}>Nearby Services</Text>
             <Text style={styles.headerSub}>
-              {userLocation ? 'Find care around you' : 'Showing centres in Nakuru'}
+              {lookupError
+                ? lookupError
+                : userLocation
+                  ? `${filtered.length} ${activeFilter.toLowerCase()} nearby`
+                  : 'Finding your location'}
             </Text>
           </View>
           {/* Map / List toggle */}
@@ -185,6 +431,9 @@ export default function MapScreen() {
               <Text style={[styles.filterChipText, activeFilter === tab && styles.filterChipTextActive]}>
                 {tab}
               </Text>
+              <Text style={[styles.filterCount, activeFilter === tab && styles.filterCountActive]}>
+                {getFilterCount(tab)}
+              </Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
@@ -200,9 +449,9 @@ export default function MapScreen() {
             initialRegion={
               userLocation
                 ? { ...userLocation, latitudeDelta: 0.08, longitudeDelta: 0.08 }
-                : { latitude: -0.2833, longitude: 36.0667, latitudeDelta: 0.08, longitudeDelta: 0.08 }
+                : { latitude: -1.286389, longitude: 36.817223, latitudeDelta: 0.25, longitudeDelta: 0.25 }
             }
-            showsUserLocation
+            showsUserLocation={Boolean(userLocation)}
             showsMyLocationButton={false}
             onPress={() => setSelected(null)}
           >
@@ -210,7 +459,7 @@ export default function MapScreen() {
             {userLocation && (
               <Circle
                 center={userLocation}
-                radius={3000}
+                radius={SEARCH_RADIUS_METRES}
                 fillColor="rgba(11,110,110,0.05)"
                 strokeColor="rgba(11,110,110,0.2)"
                 strokeWidth={1}
@@ -223,8 +472,10 @@ export default function MapScreen() {
                 <Marker
                   key={centre.id}
                   coordinate={{ latitude: centre.lat, longitude: centre.lng }}
-                  onPress={() => setSelected(centre)}
+                  title={centre.name}
+                  description={`${centre.type}${centre.distance ? ` · ${centre.distance.toFixed(1)} km away` : ''}`}
                   pinColor={cfg.color}
+                  onPress={() => setSelected(centre)}
                 />
               );
             })}
@@ -234,7 +485,15 @@ export default function MapScreen() {
           {loading && (
             <View style={styles.loadingOverlay}>
               <ActivityIndicator size="large" color={TEAL} />
-              <Text style={styles.loadingText}>Finding centres near you...</Text>
+              <Text style={styles.loadingText}>{loadingLabel}</Text>
+            </View>
+          )}
+
+          {!loading && filtered.length === 0 && (
+            <View style={styles.emptyOverlay}>
+              <Ionicons name="medical-outline" size={22} color={TEAL} />
+              <Text style={styles.emptyTitle}>No {activeFilter.toLowerCase()} found nearby</Text>
+              <Text style={styles.emptySub}>Try Care or All to broaden the results.</Text>
             </View>
           )}
 
@@ -408,6 +667,9 @@ const styles = StyleSheet.create({
 
   filters: { paddingHorizontal: 16, paddingBottom: 12, gap: 8 },
   filterChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     paddingHorizontal: 14, paddingVertical: 6,
     borderRadius: 20,
     backgroundColor: 'rgba(255,255,255,0.15)',
@@ -415,6 +677,12 @@ const styles = StyleSheet.create({
   filterChipActive: { backgroundColor: '#fff' },
   filterChipText:   { color: 'rgba(255,255,255,0.8)', fontSize: 13, fontWeight: '600' },
   filterChipTextActive: { color: TEAL },
+  filterCount: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  filterCountActive: { color: TEAL },
 
   // Map
   mapWrap: { flex: 1 },
@@ -428,6 +696,26 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   loadingText: { fontSize: 14, color: TEAL, fontWeight: '500' },
+
+  emptyOverlay: {
+    position: 'absolute',
+    top: 18,
+    left: 18,
+    right: 18,
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    padding: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
+  },
+  emptyTitle: { flex: 1, fontSize: 13, color: '#1a1a1a', fontWeight: '800' },
+  emptySub: { display: 'none' },
 
   myLocationBtn: {
     position: 'absolute',

@@ -2,10 +2,11 @@ import { useState, useRef, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
   ScrollView, StyleSheet, KeyboardAvoidingView,
-  Platform, Animated, Modal, Pressable,
+  Platform, Animated, Modal, Pressable, Keyboard,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useAuthStore } from '../../src/store/authStore';
 import {
   sendMessage,
@@ -164,6 +165,7 @@ function SubscribeModal({
 export default function ChatScreen() {
   const token  = useAuthStore((state) => state.token);
   const router = useRouter();
+  const tabBarHeight = useBottomTabBarHeight();
 
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -172,13 +174,13 @@ export default function ChatScreen() {
       time: getTime(),
     },
   ]);
-  const [input,          setInput]          = useState('');
-  const [loading,        setLoading]        = useState(false);
-  const [showModal,      setShowModal]      = useState(false);
-  const [chatStatus,     setChatStatus]     = useState<ChatStatusResponse | null>(null);
+  const [input,      setInput]      = useState('');
+  const [loading,    setLoading]    = useState(false);
+  const [showModal,  setShowModal]  = useState(false);
+  const [keyboardShown, setKeyboardShown] = useState(false);
+  const [chatStatus, setChatStatus] = useState<ChatStatusResponse | null>(null);
   const scrollRef = useRef<ScrollView>(null);
 
-  // Fetch chat status on mount
   useEffect(() => {
     getChatStatus(token)
       .then(setChatStatus)
@@ -189,11 +191,20 @@ export default function ChatScreen() {
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
   }, [messages, loading]);
 
+  useEffect(() => {
+    const showSub = Keyboard.addListener('keyboardDidShow', () => setKeyboardShown(true));
+    const hideSub = Keyboard.addListener('keyboardDidHide', () => setKeyboardShown(false));
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
+
   const handleSend = async (text?: string) => {
     const userMessage = (text ?? input).trim();
     if (!userMessage || loading) return;
 
-    // Block locally if already at limit (avoids unnecessary API call)
     if (chatStatus && !chatStatus.is_subscribed && chatStatus.limit_reached) {
       setShowModal(true);
       return;
@@ -205,10 +216,7 @@ export default function ChatScreen() {
 
     try {
       const data = await sendMessage(userMessage, token);
-
       setMessages((prev) => [...prev, { role: 'ai', text: data.reply, time: getTime() }]);
-
-      // Sync updated count from response
       setChatStatus((prev) => prev ? {
         ...prev,
         chat_count:    data.chat_count,
@@ -216,10 +224,8 @@ export default function ChatScreen() {
         limit_reached: !data.is_subscribed && data.chat_count >= data.limit,
         remaining:     Math.max(0, data.limit - data.chat_count),
       } : prev);
-
     } catch (err) {
       if (err instanceof ChatLimitError) {
-        // Show paywall modal
         setChatStatus((prev) => prev ? { ...prev, limit_reached: true, remaining: 0 } : prev);
         setShowModal(true);
       } else {
@@ -239,19 +245,19 @@ export default function ChatScreen() {
 
   const handleSubscribe = (plan: string) => {
     setShowModal(false);
-    // Navigate to subscription screen with selected plan
     router.push({ pathname: '/(tabs)/subscription', params: { plan } });
   };
 
-  // Remaining chats counter badge
-  const remaining = chatStatus?.remaining ?? null;
+  const remaining  = chatStatus?.remaining ?? null;
   const showCounter = chatStatus && !chatStatus.is_subscribed && !chatStatus.limit_reached;
+
+  const bottomSpacer = keyboardShown ? 0 : tabBarHeight;
 
   return (
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={90}
+      keyboardVerticalOffset={0}
     >
       {/* ── Header ── */}
       <View style={styles.header}>
@@ -270,7 +276,6 @@ export default function ChatScreen() {
         </View>
 
         <View style={styles.headerRight}>
-          {/* Remaining badge */}
           {showCounter && remaining !== null && (
             <View style={styles.counterBadge}>
               <Text style={styles.counterText}>{remaining} free left</Text>
@@ -314,6 +319,8 @@ export default function ChatScreen() {
         style={styles.messages}
         contentContainerStyle={styles.messagesContent}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"   // ✅ FIX: tapping list won't dismiss keyboard
+        keyboardDismissMode="interactive"      // ✅ FIX: keyboard follows drag on iOS
       >
         {messages.map((msg, i) => (
           <View
@@ -347,7 +354,10 @@ export default function ChatScreen() {
 
       {/* ── Input (locked state) ── */}
       {chatStatus?.limit_reached ? (
-        <TouchableOpacity style={styles.lockedBar} onPress={() => setShowModal(true)}>
+        <TouchableOpacity
+          style={[styles.lockedBar, { marginBottom: bottomSpacer }]}
+          onPress={() => setShowModal(true)}
+        >
           <Ionicons name="lock-closed" size={16} color={TEAL} />
           <Text style={styles.lockedBarText}>Subscribe to continue chatting</Text>
           <View style={styles.lockedBarBtn}>
@@ -355,7 +365,7 @@ export default function ChatScreen() {
           </View>
         </TouchableOpacity>
       ) : (
-        <View style={styles.inputRow}>
+        <View style={[styles.inputRow, { marginBottom: bottomSpacer }]}>
           <TextInput
             style={styles.input}
             placeholder="Type your symptoms..."
@@ -364,6 +374,9 @@ export default function ChatScreen() {
             onChangeText={setInput}
             multiline
             maxLength={1000}
+            returnKeyType="send"                          // ✅ FIX: shows send key on keyboard
+            onSubmitEditing={() => handleSend()}          // ✅ FIX: send on keyboard return
+            blurOnSubmit={false}                          // ✅ FIX: keeps keyboard open after send
           />
           <TouchableOpacity
             style={[styles.sendBtn, (!input.trim() || loading) && styles.sendDisabled]}

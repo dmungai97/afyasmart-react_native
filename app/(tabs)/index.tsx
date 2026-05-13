@@ -1,6 +1,6 @@
 import {
   View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, ImageBackground, StatusBar,
+  StyleSheet, StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -8,13 +8,11 @@ import { useAuthStore } from '../../src/store/authStore';
 
 const TEAL        = '#0B6E6E';
 const TEAL_DARK   = '#084F4F';
-const TEAL_LIGHT  = '#E6F4F4';
 const PURPLE      = '#7C3AED';
 const ORANGE      = '#EA580C';
 const RED         = '#DC2626';
 const BLUE        = '#2563EB';
 const GREEN       = '#16A34A';
-const GOLD        = '#D97706';
 
 type Feature = {
   icon: keyof typeof Ionicons.glyphMap;
@@ -26,8 +24,8 @@ type Feature = {
 };
 
 export default function HomeScreen() {
-  const router   = useRouter();
-  const user     = useAuthStore((s) => s.user);
+  const router    = useRouter();
+  const user      = useAuthStore((s) => s.user);
   const clearAuth = useAuthStore((s) => s.clearAuth);
 
   const getHour = () => new Date().getHours();
@@ -79,7 +77,6 @@ export default function HomeScreen() {
         {/* ── Header ── */}
         <View style={styles.header}>
           <View style={styles.headerLeft}>
-            {/* Avatar */}
             <View style={styles.avatar}>
               <Text style={styles.avatarText}>
                 {(user?.name?.[0] ?? 'U').toUpperCase()}
@@ -90,6 +87,12 @@ export default function HomeScreen() {
                 Hi, {user?.name?.split(' ')[0] ?? 'there'} 👋
               </Text>
               <Text style={styles.subText}>How can we help you today?</Text>
+              {/*  Change 3: Premium chip for subscribed users */}
+              {user?.is_subscribed && (
+                <View style={styles.subscribedChip}>
+                  <Text style={styles.subscribedChipText}> Premium</Text>
+                </View>
+              )}
             </View>
           </View>
           <TouchableOpacity style={styles.bellBtn}>
@@ -111,18 +114,16 @@ export default function HomeScreen() {
               <Text style={styles.heroBtnText}>Chat Now</Text>
             </TouchableOpacity>
           </View>
-          {/* Doctor illustration placeholder */}
           <View style={styles.heroIllustration}>
             <View style={styles.doctorCircle}>
               <Ionicons name="person" size={48} color={TEAL} />
             </View>
-            {/* Pulse rings */}
             <View style={[styles.ring, { width: 80, height: 80, opacity: 0.15 }]} />
             <View style={[styles.ring, { width: 100, height: 100, opacity: 0.08 }]} />
           </View>
         </View>
 
-        {/* ── Section: What would you like to do ── */}
+        {/* ── Feature Grid ── */}
         <Text style={styles.sectionTitle}>What would you like to do?</Text>
         <View style={styles.featureGrid}>
           {features.map((f, i) => (
@@ -141,44 +142,28 @@ export default function HomeScreen() {
           ))}
         </View>
 
-        {/* ── Unlock Full Access Banner ── */}
-        <View style={styles.unlockBanner}>
-          <View style={styles.unlockLeft}>
-            <View style={styles.crownWrap}>
-              <Text style={styles.crownEmoji}>👑</Text>
+        {/* ✅ Change 1: Unlock banner — hidden for subscribed users */}
+        {!user?.is_subscribed && (
+          <View style={styles.unlockBanner}>
+            <View style={styles.unlockLeft}>
+              <View style={styles.crownWrap}>
+                <Text style={styles.crownEmoji}>👑</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.unlockTitle}>Unlock Full Access</Text>
+                <Text style={styles.unlockSub}>
+                  Subscribe to access all features without limits.
+                </Text>
+              </View>
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.unlockTitle}>Unlock Full Access</Text>
-              <Text style={styles.unlockSub}>
-                Subscribe to access all features without limits.
-              </Text>
-            </View>
+            <TouchableOpacity
+              style={styles.viewPlansBtn}
+              onPress={() => router.push('/(tabs)/subscription' as any)}
+            >
+              <Text style={styles.viewPlansBtnText}>View Plans</Text>
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity
-            style={styles.viewPlansBtn}
-           onPress={() => router.push('/(tabs)/subscription' as any)}
-          >
-            <Text style={styles.viewPlansBtnText}>View Plans</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* ── Quick Stats ── */}
-        <View style={styles.statsRow}>
-          <View style={styles.statCard}>
-            <Ionicons name="shield-checkmark" size={20} color={GREEN} />
-            <Text style={styles.statLabel}>Private</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statCard}>
-            <Ionicons name="lock-closed" size={20} color={BLUE} />
-            <Text style={styles.statLabel}>Secure</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statCard}>
-            <Ionicons name="people" size={20} color={TEAL} />
-            <Text style={styles.statLabel}>Trusted</Text>
-          </View>
-        </View>
+        )}
 
         {/* ── Emergency Banner ── */}
         <View style={styles.emergencyBanner}>
@@ -188,8 +173,14 @@ export default function HomeScreen() {
           </Text>
         </View>
 
-        {/* Logout */}
-        <TouchableOpacity style={styles.logoutRow} onPress={() => clearAuth()}>
+        {/* ✅ Change 2: Logout with redirect */}
+        <TouchableOpacity
+          style={styles.logoutRow}
+          onPress={async () => {
+            await clearAuth();
+            router.replace('/(auth)/login' as any);
+          }}
+        >
           <Ionicons name="log-out-outline" size={16} color="#999" />
           <Text style={styles.logoutText}>Sign out</Text>
         </TouchableOpacity>
@@ -227,6 +218,21 @@ const styles = StyleSheet.create({
     width: 36, height: 36, borderRadius: 18,
     backgroundColor: 'rgba(255,255,255,0.15)',
     alignItems: 'center', justifyContent: 'center',
+  },
+
+  // New: Premium chip
+  subscribedChip: {
+    marginTop: 4,
+    backgroundColor: 'rgba(22,163,74,0.20)',
+    borderRadius: 20,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    alignSelf: 'flex-start',
+  },
+  subscribedChipText: {
+    color: '#4ADE80',
+    fontSize: 11,
+    fontWeight: '700',
   },
 
   // ── Hero Banner ──

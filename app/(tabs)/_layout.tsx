@@ -46,7 +46,7 @@ export default function TabLayout() {
         tabBarActiveTintColor: TEAL,
         tabBarInactiveTintColor: '#9aa0a6',
 
-        // FIXED ANDROID NAVIGATION OVERLAP
+        // Keep the floating tab bar out of the keyboard path.
         tabBarHideOnKeyboard: true,
 
         tabBarStyle: {
@@ -207,6 +207,11 @@ export default function TabLayout() {
 
       <Tabs.Screen
         name="symptoms"
+        options={{ href: null }}
+      />
+
+      <Tabs.Screen
+        name="diagnosis-results"
         options={{ href: null }}
       />
     </Tabs>
