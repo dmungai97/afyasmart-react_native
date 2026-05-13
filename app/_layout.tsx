@@ -42,7 +42,7 @@ export default function RootLayout() {
     if (inSubscription) return;
 
     if (!hasCompletedOnboarding) {
-      if (!onWelcome) router.replace("/(onboarding)/welcome" as any);
+      if (!inOnboarding) router.replace("/(onboarding)/welcome" as any);
       return;
     }
 
