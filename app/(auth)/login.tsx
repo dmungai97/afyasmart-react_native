@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,15 +11,27 @@ import {
   StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import { loginUser } from '../../src/services/auth.service';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import Constants from 'expo-constants';
+import * as Google from 'expo-auth-session/providers/google';
+import * as WebBrowser from 'expo-web-browser';
+import { AuthResponse, loginUser, signInWithGoogleIdToken } from '../../src/services/auth.service';
 import { useAuthStore } from '../../src/store/authStore';
 
 const TEAL = '#0B6E6E';
 const TEAL_DARK = '#063D3D';
 
+WebBrowser.maybeCompleteAuthSession();
+
+type GoogleExtra = {
+  googleWebClientId?: string;
+  googleIosClientId?: string;
+  googleAndroidClientId?: string;
+};
+
 export default function LoginScreen() {
   const router = useRouter();
+  const { plan } = useLocalSearchParams<{ plan?: string }>();
 
   const setAuth = useAuthStore((s) => s.setAuth);
   const completeOnboarding = useAuthStore((s) => s.completeOnboarding);
@@ -31,6 +43,63 @@ export default function LoginScreen() {
   const [focusedField, setFocusedField] = useState<string | null>(null);
 
   const isSubmitting = useRef(false);
+  const googleExtra = (Constants.expoConfig?.extra?.firebase ?? {}) as GoogleExtra;
+  const googleWebClientId =
+    process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ??
+    googleExtra.googleWebClientId;
+  const googleIosClientId =
+    process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID ??
+    googleExtra.googleIosClientId ??
+    googleWebClientId;
+  const googleAndroidClientId =
+    process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID ??
+    googleExtra.googleAndroidClientId ??
+    googleWebClientId;
+  const googleConfigured = Boolean(googleWebClientId && googleAndroidClientId);
+  const [googleRequest, googleResponse, promptGoogle] = Google.useIdTokenAuthRequest({
+    webClientId: googleWebClientId ?? 'not-configured.apps.googleusercontent.com',
+    iosClientId: googleIosClientId ?? 'not-configured.apps.googleusercontent.com',
+    androidClientId: googleAndroidClientId ?? 'not-configured.apps.googleusercontent.com',
+  });
+
+  const routeAfterAuth = useCallback(async (data: AuthResponse) => {
+    await setAuth(data.token, data.user, data.isNewUser ?? false);
+
+    if (plan) {
+      router.replace({
+        pathname: '/(tabs)/subscription' as any,
+        params: { plan },
+      });
+      return;
+    }
+
+    if (data.user.is_subscribed) {
+      await completeOnboarding();
+    }
+
+    router.replace('/(tabs)' as any);
+  }, [completeOnboarding, plan, router, setAuth]);
+
+  useEffect(() => {
+    const idToken =
+      googleResponse?.type === 'success'
+        ? googleResponse.params?.id_token
+        : null;
+
+    if (!idToken) return;
+
+    (async () => {
+      setLoading(true);
+      try {
+        const data = await signInWithGoogleIdToken(idToken);
+        await routeAfterAuth(data);
+      } catch (error: any) {
+        alert(error?.message ?? 'Google sign-in failed. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [googleResponse, routeAfterAuth]);
 
 const handleLogin = async () => {
   if (!email || !password) {
@@ -45,23 +114,27 @@ const handleLogin = async () => {
   try {
     const data = await loginUser(email, password);
 
-    // Set auth — _layout.tsx will route based on is_subscribed
-    await setAuth(data.token, data.user, false);
-
-    // Only mark onboarding done for already-subscribed users
-    if (data.user.is_subscribed) {
-      await completeOnboarding();
-    }
+    await routeAfterAuth(data);
 
   } catch (error: any) {
     const message =
       error?.response?.data?.message ||
+      error?.message ||
       'Login failed. Please try again.';
     alert(message);
   } finally {
     setLoading(false);
     isSubmitting.current = false;
   }
+};
+
+const handleGoogleSignIn = async () => {
+  if (!googleConfigured || !googleRequest) {
+    alert('Google sign-in needs Google OAuth client IDs in app.json.');
+    return;
+  }
+
+  await promptGoogle();
 };
 
   return (
@@ -353,7 +426,11 @@ const handleLogin = async () => {
 
           {/* Social buttons */}
           <View style={styles.socialRow}>
-            <TouchableOpacity style={styles.socialBtn}>
+            <TouchableOpacity
+              style={styles.socialBtn}
+              onPress={handleGoogleSignIn}
+              disabled={loading}
+            >
               <Ionicons
                 name="logo-google"
                 size={20}
@@ -381,9 +458,17 @@ const handleLogin = async () => {
           {/* Register */}
           <TouchableOpacity
             style={styles.registerRow}
-            onPress={() =>
-              router.push('/(auth)/register' as any)
-            }
+            onPress={() => {
+              if (plan) {
+                router.push({
+                  pathname: '/(auth)/register' as any,
+                  params: { plan },
+                });
+                return;
+              }
+
+              router.push('/(auth)/register' as any);
+            }}
           >
             <Text style={styles.registerText}>
               Don&apos;t have an account?

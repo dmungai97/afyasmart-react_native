@@ -6,9 +6,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useAuthStore } from '../../src/store/authStore';
 import { buildDiagnosisFromSymptoms, useDiagnosisStore } from '../../src/store/diagnosisStore';
-import api from '../../src/services/api';
 
 const TEAL      = '#0B6E6E';
 const TEAL_DARK = '#063D3D';
@@ -29,7 +27,6 @@ const INITIAL_MESSAGES: Message[] = [
 
 export default function SymptomChatScreen() {
   const router = useRouter();
-  const token  = useAuthStore((s) => s.token);
   const setPendingDiagnosis = useDiagnosisStore((s) => s.setPendingDiagnosis);
 
   const [messages, setMessages]   = useState<Message[]>(INITIAL_MESSAGES);
@@ -72,9 +69,12 @@ export default function SymptomChatScreen() {
     const text = input.trim();
     if (!text || loading) return;
 
+    const diagnosis = buildDiagnosisFromSymptoms(text);
+    const topCondition = diagnosis.conditions[0]?.name ?? 'a possible health concern';
+
     setInput('');
     setHasSymptoms(true);
-    setPendingDiagnosis(buildDiagnosisFromSymptoms(text));
+    setPendingDiagnosis(diagnosis);
 
     // Add user message
     setMessages((prev) => [...prev, { role: 'user', text }]);
@@ -84,34 +84,31 @@ export default function SymptomChatScreen() {
     startDots();
     setMessages((prev) => [...prev, { role: 'assistant', text: '', typing: true }]);
 
-    try {
-      const res = await api.post(
-        '/chat/send',
-        { message: text },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
-      const reply: string = res.data.reply ?? '';
-
-      // Remove typing bubble, add real reply
+    setTimeout(() => {
       setMessages((prev) => {
         const without = prev.filter((m) => !m.typing);
-        return [...without, { role: 'assistant', text: reply }];
+        return [...without, {
+          role: 'assistant',
+          text:
+            `I found patterns that may relate to ${topCondition}.\n\n` +
+            "I'm preparing your full report now: possible causes, urgency level, treatment advice, and nearby care options.",
+        }];
       });
 
       stopDots();
       setLoading(false);
 
-      // After first AI reply — wait 1.5s then show lock screen
       setTimeout(() => {
-        router.push('/(onboarding)/locked-results' as any);
-      }, 2000);
-
+        router.push('/(onboarding)/analysis-loading' as any);
+      }, 1200);
+    }, 2200);
+  };
+/*
     } catch (err: any) {
       stopDots();
       setLoading(false);
 
-      const limitReached = err?.response?.data?.limit_reached;
+      const limitReached = err instanceof ChatLimitError;
 
       setMessages((prev) => {
         const without = prev.filter((m) => !m.typing);
@@ -131,7 +128,7 @@ export default function SymptomChatScreen() {
         setTimeout(() => router.push('/(onboarding)/locked-results' as any), 2000);
       }
     }
-  };
+*/
 
   return (
     <KeyboardAvoidingView

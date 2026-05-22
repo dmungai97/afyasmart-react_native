@@ -7,7 +7,27 @@
       "softwareKeyboardLayoutMode": "resize",
       "package": "com.afyasmart.app"
     },
+    "updates": {
+      "enabled": false,
+      "checkAutomatically": "ON_ERROR_RECOVERY",
+      "fallbackToCacheTimeout": 0
+    },
     "extra": {
+      "firebase": {
+        "apiKey": "AIzaSyARDyOIw9-DDKRS1keQLcuOGtA2tuEzYKY",
+        "authDomain": "afya-smart-377ad.firebaseapp.com",
+        "projectId": "afya-smart-377ad",
+        "storageBucket": "afya-smart-377ad.firebasestorage.app",
+        "messagingSenderId": "485330882915",
+        "appId": "1:485330882915:web:b18e7d9d2427ba55e14356",
+        "measurementId": "G-PGTPT6FZGE",
+        "googleWebClientId": "485330882915-0f3f3hlv83abmu911r9jgaq8rm914uj0.apps.googleusercontent.com",
+        // "googleAndroidClientId": "",
+        // "googleIosClientId": "",
+        "functionsRegion": "us-central1",
+        "functionsBaseUrl": "https://us-central1-afya-smart-377ad.cloudfunctions.net",
+        "mpesaApiBaseUrl": "https://afyasmart-ey9q.onrender.com/api/v1"
+      },
       "eas": {
         "projectId": "bbf76662-aebe-40e3-8aff-2f9e3a7eec95"
       }

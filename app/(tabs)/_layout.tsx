@@ -2,6 +2,8 @@ import { Tabs } from 'expo-router';
 import { View, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useAuthStore } from '../../src/store/authStore';
+import { isSubscriptionActive } from '../../src/services/subscription.model';
 
 const TEAL = '#0B6E6E';
 
@@ -37,6 +39,8 @@ function TabIcon({
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
+  const user = useAuthStore((state) => state.user);
+  const hasFullAccess = isSubscriptionActive(user);
 
   return (
     <Tabs
@@ -124,6 +128,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="doctors"
         options={{
+          href: hasFullAccess ? undefined : null,
           title: 'Doctors',
           tabBarIcon: ({ focused }) => (
             <TabIcon
@@ -141,6 +146,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="map"
         options={{
+          href: hasFullAccess ? undefined : null,
           title: 'Map',
           tabBarIcon: ({ focused }) => (
             <TabIcon

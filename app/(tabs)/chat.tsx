@@ -1,11 +1,11 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
   ScrollView, StyleSheet, KeyboardAvoidingView,
   Platform, Animated, Modal, Pressable, Keyboard,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useAuthStore } from '../../src/store/authStore';
 import {
@@ -164,6 +164,7 @@ function SubscribeModal({
 // ── Main screen ───────────────────────────────────────────────────────────────
 export default function ChatScreen() {
   const token  = useAuthStore((state) => state.token);
+  const user = useAuthStore((state) => state.user);
   const router = useRouter();
   const tabBarHeight = useBottomTabBarHeight();
 
@@ -181,11 +182,21 @@ export default function ChatScreen() {
   const [chatStatus, setChatStatus] = useState<ChatStatusResponse | null>(null);
   const scrollRef = useRef<ScrollView>(null);
 
-  useEffect(() => {
+  const refreshChatStatus = useCallback(() => {
     getChatStatus(token)
       .then(setChatStatus)
       .catch(() => {});
   }, [token]);
+
+  useEffect(() => {
+    refreshChatStatus();
+  }, [refreshChatStatus, user?.is_subscribed, user?.subscription_expires_at]);
+
+  useFocusEffect(
+    useCallback(() => {
+      refreshChatStatus();
+    }, [refreshChatStatus]),
+  );
 
   useEffect(() => {
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
@@ -250,6 +261,7 @@ export default function ChatScreen() {
 
   const remaining  = chatStatus?.remaining ?? null;
   const showCounter = chatStatus && !chatStatus.is_subscribed && !chatStatus.limit_reached;
+  const isChatLocked = Boolean(chatStatus && !chatStatus.is_subscribed && chatStatus.limit_reached);
 
   const bottomSpacer = keyboardShown ? 0 : tabBarHeight;
 
@@ -281,7 +293,7 @@ export default function ChatScreen() {
               <Text style={styles.counterText}>{remaining} free left</Text>
             </View>
           )}
-          {chatStatus?.limit_reached && (
+          {isChatLocked && (
             <TouchableOpacity style={styles.unlockBtn} onPress={() => setShowModal(true)}>
               <Ionicons name="lock-closed" size={12} color="#fff" />
               <Text style={styles.unlockBtnText}>Unlock</Text>
@@ -353,7 +365,7 @@ export default function ChatScreen() {
       </ScrollView>
 
       {/* ── Input (locked state) ── */}
-      {chatStatus?.limit_reached ? (
+      {isChatLocked ? (
         <TouchableOpacity
           style={[styles.lockedBar, { marginBottom: bottomSpacer }]}
           onPress={() => setShowModal(true)}

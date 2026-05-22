@@ -6,6 +6,7 @@ import {
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useDiagnosisStore } from '../../src/store/diagnosisStore';
+import { useAuthStore } from '../../src/store/authStore';
 
 const TEAL       = '#0B6E6E';
 const TEAL_DARK  = '#063D3D';
@@ -34,6 +35,7 @@ const PLANS = [
 export default function LockedResultsScreen() {
   const router = useRouter();
   const diagnosis = useDiagnosisStore((s) => s.pendingDiagnosis);
+  const token = useAuthStore((s) => s.token);
 
   // ── Animations ─────────────────────────────────────────────
   const fadeAnim   = useRef(new Animated.Value(0)).current;
@@ -69,9 +71,17 @@ export default function LockedResultsScreen() {
   }, []);
 
   const handleSubscribe = (planId: string) => {
+    if (token) {
+      router.push({
+        pathname: '/(tabs)/subscription' as any,
+        params: { plan: planId },
+      });
+      return;
+    }
+
     router.push({
-      pathname: '/(tabs)/subscription' as any,
-      params: { plan: planId },
+      pathname: '/(auth)/register' as any,
+      params: { plan: planId, from: 'locked-results' },
     });
   };
 

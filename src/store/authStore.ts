@@ -1,12 +1,13 @@
-import { create } from 'zustand';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { create } from "zustand";
 
 type User = {
-  id: number;
+  id: string;
   name: string;
   email: string;
   phone?: string;
   is_subscribed: boolean;
+  subscription_plan?: string | null;
   chat_count: number;
   subscription_expires_at: string | null;
 };
@@ -18,16 +19,17 @@ type AuthState = {
   isNewUser: boolean;
 
   // Actions
-  setAuth:             (token: string, user: User, isNew?: boolean) => Promise<void>;
-  clearAuth:           () => Promise<void>;
-  loadAuth:            () => Promise<void>;
-  completeOnboarding:  () => Promise<void>;
-  updateSubscription:  (data: {
+  setAuth: (token: string, user: User, isNew?: boolean) => Promise<void>;
+  clearAuth: () => Promise<void>;
+  loadAuth: () => Promise<void>;
+  completeOnboarding: () => Promise<void>;
+  updateSubscription: (data: {
     is_subscribed: boolean;
+    subscription_plan?: string | null;
     chat_count?: number;
     subscription_expires_at?: string | null;
   }) => Promise<void>;
-  refreshUser:         (token: string) => Promise<void>;
+  refreshUser: (token: string) => Promise<void>;
 };
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -37,63 +39,86 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   isNewUser: false,
 
   setAuth: async (token, user, isNew = false) => {
-    await AsyncStorage.setItem('token', token);
-    await AsyncStorage.setItem('user', JSON.stringify(user));
+    await AsyncStorage.setItem("token", token);
+    await AsyncStorage.setItem("user", JSON.stringify(user));
     set({ token, user, isNewUser: isNew });
   },
 
   clearAuth: async () => {
-    await AsyncStorage.removeItem('token');
-    await AsyncStorage.removeItem('user');
-    await AsyncStorage.removeItem('hasCompletedOnboarding');
-    set({ token: null, user: null, hasCompletedOnboarding: false, isNewUser: false });
+    try {
+      const { logoutUser } = await import("../services/auth.service");
+      await logoutUser();
+    } catch {
+      // Local state should still clear if Firebase sign-out is unavailable.
+    }
+
+    await AsyncStorage.removeItem("token");
+    await AsyncStorage.removeItem("user");
+    await AsyncStorage.removeItem("hasCompletedOnboarding");
+    set({
+      token: null,
+      user: null,
+      hasCompletedOnboarding: false,
+      isNewUser: false,
+    });
   },
 
   loadAuth: async () => {
-    const token    = await AsyncStorage.getItem('token');
-    const raw      = await AsyncStorage.getItem('user');
-    const onboarded= await AsyncStorage.getItem('hasCompletedOnboarding');
+    const token = await AsyncStorage.getItem("token");
+    const raw = await AsyncStorage.getItem("user");
+    const onboarded = await AsyncStorage.getItem("hasCompletedOnboarding");
     const user: User | null = raw ? JSON.parse(raw) : null;
     set({
       token: token ?? null,
       user,
-      hasCompletedOnboarding: onboarded === 'true',
+      hasCompletedOnboarding: onboarded === "true",
       isNewUser: false,
     });
   },
 
   completeOnboarding: async () => {
-    await AsyncStorage.setItem('hasCompletedOnboarding', 'true');
+    await AsyncStorage.setItem("hasCompletedOnboarding", "true");
     set({ hasCompletedOnboarding: true, isNewUser: false });
   },
 
   // Call this after a successful subscription payment
-  updateSubscription: async ({ is_subscribed, chat_count, subscription_expires_at }) => {
+  updateSubscription: async ({
+    is_subscribed,
+    subscription_plan,
+    chat_count,
+    subscription_expires_at,
+  }) => {
     const current = get().user;
     if (!current) return;
 
     const updated: User = {
       ...current,
       is_subscribed,
-      chat_count:              chat_count             ?? current.chat_count,
-      subscription_expires_at: subscription_expires_at ?? current.subscription_expires_at,
+      subscription_plan: subscription_plan ?? current.subscription_plan,
+      chat_count: chat_count ?? current.chat_count,
+      subscription_expires_at:
+        subscription_expires_at ?? current.subscription_expires_at,
     };
 
-    await AsyncStorage.setItem('user', JSON.stringify(updated));
+    await AsyncStorage.setItem("user", JSON.stringify(updated));
     set({ user: updated });
   },
 
-  // Call after login/payment to sync latest user state from server
+  // Call after login/payment to sync latest user state from Firebase
   refreshUser: async (token: string) => {
     try {
-      const { default: api } = await import('../services/api');
-      const res = await api.get('/auth/me', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const user: User = res.data.user;
-      await AsyncStorage.setItem('user', JSON.stringify(user));
-      set({ user });
-    } catch {
+      const { getCurrentUserProfile } = await import("../services/auth.service");
+      const { firebaseAuth } = await import("../services/firebase");
+      const user = await getCurrentUserProfile();
+      if (!user) return;
+
+      const freshToken = await firebaseAuth.currentUser?.getIdToken();
+
+      await AsyncStorage.setItem("user", JSON.stringify(user));
+      if (freshToken) await AsyncStorage.setItem("token", freshToken);
+      set({ user, token: freshToken ?? token });
+    } catch (error) {
+      console.error("Failed to refresh user", error);
       // silently fail — stale data is acceptable
     }
   },

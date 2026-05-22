@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'rea
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../../src/store/authStore';
 import { useRouter } from 'expo-router';
+import { getAccessState } from '../../src/services/subscription.model';
 
 const TEAL = '#0B6E6E';
 
@@ -20,6 +21,7 @@ export default function ProfileScreen() {
   const refreshUser = useAuthStore((state) => state.refreshUser);
   const token       = useAuthStore((state) => state.token);
   const router      = useRouter();
+  const access      = getAccessState(user);
 
   // Refresh user on mount so subscription status is always current
   useEffect(() => {
@@ -67,7 +69,7 @@ export default function ProfileScreen() {
           icon: 'card-outline',
           label: 'Subscription Plan',
           // Dynamic status text
-          sub: user?.is_subscribed ? ' Active · Manage plan' : '⚪ Free plan · Upgrade',
+          sub: access.subscribed ? `${access.plan} plan active` : 'Free plan · Upgrade',
           onPress: () => router.push('/(tabs)/subscription' as any),
         },
         { icon: 'receipt-outline', label: 'Payment History', sub: 'View transactions' },
@@ -125,13 +127,13 @@ export default function ProfileScreen() {
             <View style={styles.planStatusRow}>
               <View style={[
                 styles.planDot,
-                { backgroundColor: user?.is_subscribed ? '#16A34A' : '#9ca3af' }
+                { backgroundColor: access.subscribed ? '#16A34A' : '#9ca3af' }
               ]} />
               <Text style={[
                 styles.statNumber,
-                { color: user?.is_subscribed ? '#16A34A' : '#1a1a1a', fontSize: 14 }
+                { color: access.subscribed ? '#16A34A' : '#1a1a1a', fontSize: 14 }
               ]}>
-                {user?.is_subscribed ? 'Active' : 'Free'}
+                {access.subscribed ? 'Active' : 'Free'}
               </Text>
             </View>
             <Text style={styles.statLabel}>Current Plan</Text>
@@ -140,7 +142,7 @@ export default function ProfileScreen() {
       </View>
 
       {/* Upgrade banner — hidden for subscribed users */}
-      {!user?.is_subscribed && (
+      {!access.subscribed && (
         <TouchableOpacity
           style={styles.upgradeBanner}
           onPress={() => router.push('/(tabs)/subscription' as any)}

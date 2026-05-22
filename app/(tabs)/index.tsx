@@ -5,6 +5,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuthStore } from '../../src/store/authStore';
+import { getAccessState } from '../../src/services/subscription.model';
 
 const TEAL        = '#0B6E6E';
 const TEAL_DARK   = '#084F4F';
@@ -21,12 +22,14 @@ type Feature = {
   route: string;
   color: string;
   bg: string;
+  premium?: boolean;
 };
 
 export default function HomeScreen() {
   const router    = useRouter();
   const user      = useAuthStore((s) => s.user);
   const clearAuth = useAuthStore((s) => s.clearAuth);
+  const access    = getAccessState(user);
 
   const getHour = () => new Date().getHours();
   const greeting = getHour() < 12 ? 'Good morning' : getHour() < 17 ? 'Good afternoon' : 'Good evening';
@@ -47,6 +50,7 @@ export default function HomeScreen() {
       route: '/(tabs)/symptoms',
       color: GREEN,
       bg: '#EDFAF2',
+      premium: true,
     },
     {
       icon: 'medical',
@@ -55,6 +59,7 @@ export default function HomeScreen() {
       route: '/(tabs)/drugs',
       color: ORANGE,
       bg: '#FFF4ED',
+      premium: true,
     },
     {
       icon: 'location',
@@ -63,6 +68,7 @@ export default function HomeScreen() {
       route: '/(tabs)/map',
       color: RED,
       bg: '#FFF0F0',
+      premium: true,
     },
   ];
 
@@ -130,12 +136,24 @@ export default function HomeScreen() {
             <TouchableOpacity
               key={i}
               style={styles.featureCard}
-              onPress={() => router.push(f.route as any)}
+              onPress={() => {
+                if (f.premium && !access.subscribed) {
+                  router.push('/(tabs)/subscription' as any);
+                  return;
+                }
+
+                router.push(f.route as any);
+              }}
               activeOpacity={0.8}
             >
               <View style={[styles.featureIconWrap, { backgroundColor: f.bg }]}>
                 <Ionicons name={f.icon} size={26} color={f.color} />
               </View>
+              {f.premium && !access.subscribed && (
+                <View style={styles.lockBadge}>
+                  <Ionicons name="lock-closed" size={10} color="#fff" />
+                </View>
+              )}
               <Text style={styles.featureTitle}>{f.title}</Text>
               <Text style={styles.featureSub}>{f.subtitle}</Text>
             </TouchableOpacity>
@@ -143,7 +161,7 @@ export default function HomeScreen() {
         </View>
 
         {/* ✅ Change 1: Unlock banner — hidden for subscribed users */}
-        {!user?.is_subscribed && (
+        {!access.subscribed && (
           <View style={styles.unlockBanner}>
             <View style={styles.unlockLeft}>
               <View style={styles.crownWrap}>
@@ -152,7 +170,7 @@ export default function HomeScreen() {
               <View style={{ flex: 1 }}>
                 <Text style={styles.unlockTitle}>Unlock Full Access</Text>
                 <Text style={styles.unlockSub}>
-                  Subscribe to access all features without limits.
+                  {access.remainingChats} free chat{access.remainingChats === 1 ? '' : 's'} left. Subscribe for full access.
                 </Text>
               </View>
             </View>
@@ -313,6 +331,18 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 2 },
     elevation: 2,
+    position: 'relative',
+  },
+  lockBadge: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: TEAL,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   featureIconWrap: {
     width: 56, height: 56, borderRadius: 16,
