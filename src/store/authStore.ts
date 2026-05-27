@@ -7,6 +7,8 @@ type User = {
   email: string;
   phone?: string;
   is_subscribed: boolean;
+  has_subscribed: boolean;
+  onboarding_completed: boolean;
   subscription_plan?: string | null;
   chat_count: number;
   subscription_expires_at: string | null;
@@ -25,6 +27,7 @@ type AuthState = {
   completeOnboarding: () => Promise<void>;
   updateSubscription: (data: {
     is_subscribed: boolean;
+    has_subscribed?: boolean;
     subscription_plan?: string | null;
     chat_count?: number;
     subscription_expires_at?: string | null;
@@ -39,9 +42,28 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   isNewUser: false,
 
   setAuth: async (token, user, isNew = false) => {
+    const onboarded = await AsyncStorage.getItem("hasCompletedOnboarding");
+    const hasOnboarded = onboarded === "true" || user.onboarding_completed;
+    const updatedUser = { ...user, onboarding_completed: hasOnboarded };
+
     await AsyncStorage.setItem("token", token);
-    await AsyncStorage.setItem("user", JSON.stringify(user));
-    set({ token, user, isNewUser: isNew });
+    await AsyncStorage.setItem("user", JSON.stringify(updatedUser));
+    if (hasOnboarded) await AsyncStorage.setItem("hasCompletedOnboarding", "true");
+    set({
+      token,
+      user: updatedUser,
+      hasCompletedOnboarding: hasOnboarded,
+      isNewUser: isNew,
+    });
+
+    if (hasOnboarded && !user.onboarding_completed) {
+      try {
+        const { markOnboardingCompleted } = await import("../services/auth.service");
+        await markOnboardingCompleted();
+      } catch {
+        // Local onboarding state is enough to continue; server sync can happen later.
+      }
+    }
   },
 
   clearAuth: async () => {
@@ -71,19 +93,33 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({
       token: token ?? null,
       user,
-      hasCompletedOnboarding: onboarded === "true",
+      hasCompletedOnboarding: onboarded === "true" || Boolean(user?.onboarding_completed),
       isNewUser: false,
     });
   },
 
   completeOnboarding: async () => {
+    const current = get().user;
+    const updated = current ? { ...current, onboarding_completed: true } : current;
+
     await AsyncStorage.setItem("hasCompletedOnboarding", "true");
-    set({ hasCompletedOnboarding: true, isNewUser: false });
+    if (updated) await AsyncStorage.setItem("user", JSON.stringify(updated));
+    set({ user: updated, hasCompletedOnboarding: true, isNewUser: false });
+
+    if (current) {
+      try {
+        const { markOnboardingCompleted } = await import("../services/auth.service");
+        await markOnboardingCompleted();
+      } catch {
+        // Keep local completion even if Firestore is temporarily unavailable.
+      }
+    }
   },
 
   // Call this after a successful subscription payment
   updateSubscription: async ({
     is_subscribed,
+    has_subscribed,
     subscription_plan,
     chat_count,
     subscription_expires_at,
@@ -94,6 +130,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     const updated: User = {
       ...current,
       is_subscribed,
+      has_subscribed: has_subscribed ?? current.has_subscribed ?? is_subscribed,
       subscription_plan: subscription_plan ?? current.subscription_plan,
       chat_count: chat_count ?? current.chat_count,
       subscription_expires_at:

@@ -1,6 +1,8 @@
 import { collection, doc, getDoc, getDocs } from "firebase/firestore";
 import { firestore } from "./firebase";
 
+const seededDoctors = require("../../seed-data/doctors.json") as any[];
+
 export interface Doctor {
   id: number;
   name: string;
@@ -83,14 +85,26 @@ export const fetchNearbyDoctors = async (
   },
 ): Promise<DoctorsResponse> => {
   void token;
-  const snap = await getDocs(collection(firestore, "doctors"));
+  let docs: Doctor[] = [];
+  try {
+    const snap = await getDocs(collection(firestore, "doctors"));
+    docs = snap.docs.map((item, index) =>
+      mapDoctor(item.id, item.data(), index),
+    );
+  } catch {
+    docs = [];
+  }
+
   const search = options?.search?.toLowerCase().trim();
   const region = options?.region?.toLowerCase().trim();
   const specialization = options?.specialization?.toLowerCase().trim();
 
-  let doctors = snap.docs.map((item, index) =>
-    mapDoctor(item.id, item.data(), index),
-  );
+  let doctors =
+    docs.length > 0
+      ? docs
+      : seededDoctors.map((item, index) =>
+          mapDoctor(String(index + 1), item, index),
+        );
 
   doctors = doctors.filter((doctor) => {
     if (options?.available !== undefined && doctor.available !== options.available) {
@@ -141,17 +155,33 @@ export const fetchNearbyDoctors = async (
 
 export const fetchDoctor = async (id: number, token: string): Promise<Doctor> => {
   void token;
-  const snap = await getDoc(doc(firestore, "doctors", String(id)));
-  if (!snap.exists()) throw new Error("Doctor not found.");
-  return mapDoctor(snap.id, snap.data());
+  try {
+    const snap = await getDoc(doc(firestore, "doctors", String(id)));
+    if (snap.exists()) return mapDoctor(snap.id, snap.data());
+  } catch {
+    // Fall back to bundled seed data below.
+  }
+
+  const doctor = seededDoctors[id - 1];
+  if (!doctor) throw new Error("Doctor not found.");
+  return mapDoctor(String(id), doctor, id - 1);
 };
 
 export const fetchRegions = async (token: string): Promise<string[]> => {
   void token;
-  const snap = await getDocs(collection(firestore, "doctors"));
+  let items: any[] = [];
+  try {
+    const snap = await getDocs(collection(firestore, "doctors"));
+    items = snap.docs.map((item) => item.data());
+  } catch {
+    items = [];
+  }
+
+  if (items.length === 0) items = seededDoctors;
+
   const regions = new Set<string>();
-  snap.docs.forEach((item) => {
-    const region = item.data().region;
+  items.forEach((item) => {
+    const region = item.region;
     if (region) regions.add(region.charAt(0).toUpperCase() + region.slice(1));
   });
   return [...regions].sort();
@@ -159,10 +189,19 @@ export const fetchRegions = async (token: string): Promise<string[]> => {
 
 export const fetchSpecializations = async (token: string): Promise<string[]> => {
   void token;
-  const snap = await getDocs(collection(firestore, "doctors"));
+  let items: any[] = [];
+  try {
+    const snap = await getDocs(collection(firestore, "doctors"));
+    items = snap.docs.map((item) => item.data());
+  } catch {
+    items = [];
+  }
+
+  if (items.length === 0) items = seededDoctors;
+
   const specializations = new Set<string>();
-  snap.docs.forEach((item) => {
-    const specialization = item.data().specialization;
+  items.forEach((item) => {
+    const specialization = item.specialization;
     if (specialization) specializations.add(specialization);
   });
   return [...specializations].sort();

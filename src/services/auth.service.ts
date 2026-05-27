@@ -6,7 +6,7 @@ import {
   signOut,
   updateProfile,
 } from "firebase/auth";
-import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
+import { doc, getDoc, serverTimestamp, setDoc, updateDoc } from "firebase/firestore";
 import { firebaseAuth, firestore } from "./firebase";
 
 export interface AuthUser {
@@ -15,6 +15,8 @@ export interface AuthUser {
   email: string;
   phone?: string;
   is_subscribed: boolean;
+  has_subscribed: boolean;
+  onboarding_completed: boolean;
   subscription_plan?: string | null;
   chat_count: number;
   subscription_expires_at: string | null;
@@ -37,6 +39,8 @@ const defaultUser = (
   email,
   phone: phone ?? "",
   is_subscribed: false,
+  has_subscribed: false,
+  onboarding_completed: false,
   subscription_plan: "free",
   chat_count: 0,
   subscription_expires_at: null,
@@ -55,6 +59,13 @@ export const normalizeUser = (id: string, data: any): AuthUser => ({
   email: data?.email ?? "",
   phone: data?.phone ?? undefined,
   is_subscribed: Boolean(data?.is_subscribed),
+  has_subscribed: Boolean(
+    data?.has_subscribed
+      || data?.is_subscribed
+      || data?.subscription_expires_at
+      || ["daily", "weekly", "monthly"].includes(data?.subscription_plan),
+  ),
+  onboarding_completed: Boolean(data?.onboarding_completed),
   subscription_plan: data?.subscription_plan ?? "free",
   chat_count: Number(data?.chat_count ?? 0),
   subscription_expires_at: normalizeDateValue(data?.subscription_expires_at),
@@ -88,6 +99,16 @@ const getOrCreateCurrentUserProfile = async (): Promise<{
 export const getCurrentUserProfile = async (): Promise<AuthUser | null> => {
   const { user } = await getOrCreateCurrentUserProfile();
   return user;
+};
+
+export const markOnboardingCompleted = async (): Promise<void> => {
+  const current = firebaseAuth.currentUser;
+  if (!current) return;
+
+  await updateDoc(doc(firestore, "users", current.uid), {
+    onboarding_completed: true,
+    updated_at: serverTimestamp(),
+  });
 };
 
 export const loginUser = async (

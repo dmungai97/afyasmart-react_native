@@ -24,6 +24,7 @@ export const subscribeUser = async (
   const subscription_expires_at = getSubscriptionExpiry(plan);
   await updateDoc(doc(firestore, "users", uid), {
     is_subscribed: true,
+    has_subscribed: true,
     subscription_plan: plan,
     chat_count: 0,
     subscription_expires_at,
@@ -32,6 +33,7 @@ export const subscribeUser = async (
 
   await useAuthStore.getState().updateSubscription({
     is_subscribed: true,
+    has_subscribed: true,
     subscription_plan: plan,
     chat_count: 0,
     subscription_expires_at,

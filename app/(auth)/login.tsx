@@ -16,6 +16,7 @@ import Constants from 'expo-constants';
 import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
 import { AuthResponse, loginUser, signInWithGoogleIdToken } from '../../src/services/auth.service';
+import { isSubscriptionActive } from '../../src/services/subscription.model';
 import { useAuthStore } from '../../src/store/authStore';
 
 const TEAL = '#0B6E6E';
@@ -73,7 +74,7 @@ export default function LoginScreen() {
       return;
     }
 
-    if (data.user.is_subscribed) {
+    if (isSubscriptionActive(data.user)) {
       await completeOnboarding();
     }
 

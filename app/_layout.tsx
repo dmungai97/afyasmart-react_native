@@ -7,6 +7,7 @@ export default function RootLayout() {
   const token = useAuthStore((s) => s.token);
   const user = useAuthStore((s) => s.user);
   const hasCompletedOnboarding = useAuthStore((s) => s.hasCompletedOnboarding);
+  const isNewUser = useAuthStore((s) => s.isNewUser);
   const loadAuth = useAuthStore((s) => s.loadAuth);
   const segments = useSegments();
   const router = useRouter();
@@ -27,6 +28,7 @@ export default function RootLayout() {
     const onboardingRoutes = [
       "welcome",
       "health-check",
+      "analysis-loading",
       "locked-results",
       "symptom-chat",
     ];
@@ -63,6 +65,8 @@ export default function RootLayout() {
     const onRoot = first === "index" || first === "";
     const premiumRoutes = ["diagnosis-results", "doctors", "drugs", "map", "pharmacy", "symptoms"];
     const hasFullAccess = isSubscriptionActive(user);
+    const needsOnboarding =
+      isNewUser && !hasCompletedOnboarding && !user?.onboarding_completed;
 
     if (!token) {
       if (!inAuth && !inOnboarding && !onRoot && !onWelcome)
@@ -82,13 +86,13 @@ export default function RootLayout() {
       return;
     }
 
-    if (!hasCompletedOnboarding) {
+    if (needsOnboarding) {
       if (!inOnboarding) router.replace("/(onboarding)/welcome" as any);
       return;
     }
 
     if (inOnboarding) {
-      // If onboarding is already complete, redirect onboarding pages to tabs.
+      // Existing users should not be forced through the new-user flow.
       router.replace("/(tabs)" as any);
       return;
     }
@@ -96,7 +100,7 @@ export default function RootLayout() {
     if (inAuth || onRoot) {
       router.replace("/(tabs)" as any);
     }
-  }, [authLoaded, token, user, hasCompletedOnboarding, segments, router]);
+  }, [authLoaded, token, user, hasCompletedOnboarding, isNewUser, segments, router]);
 
   return <Slot />;
 }

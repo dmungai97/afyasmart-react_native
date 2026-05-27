@@ -94,7 +94,7 @@ export default function HomeScreen() {
               </Text>
               <Text style={styles.subText}>How can we help you today?</Text>
               {/*  Change 3: Premium chip for subscribed users */}
-              {user?.is_subscribed && (
+              {access.subscribed && (
                 <View style={styles.subscribedChip}>
                   <Text style={styles.subscribedChipText}> Premium</Text>
                 </View>
@@ -170,7 +170,9 @@ export default function HomeScreen() {
               <View style={{ flex: 1 }}>
                 <Text style={styles.unlockTitle}>Unlock Full Access</Text>
                 <Text style={styles.unlockSub}>
-                  {access.remainingChats} free chat{access.remainingChats === 1 ? '' : 's'} left. Subscribe for full access.
+                  {access.freeChatEligible
+                    ? `${access.remainingChats} free chat${access.remainingChats === 1 ? '' : 's'} left. Subscribe for full access.`
+                    : 'Your subscription has ended. Renew to restore full access.'}
                 </Text>
               </View>
             </View>

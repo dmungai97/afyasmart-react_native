@@ -79,8 +79,20 @@ function normalizePhone(phone) {
 }
 
 function isSubscribed(user) {
-  const expiresAt = user.subscription_expires_at?.toDate?.();
+  const rawExpiresAt = user.subscription_expires_at;
+  const expiresAt = rawExpiresAt?.toDate?.() || (rawExpiresAt ? new Date(rawExpiresAt) : null);
   return user.is_subscribed === true && (!expiresAt || expiresAt > new Date());
+}
+
+function hasEverSubscribed(user) {
+  if (!user) return false;
+  if (user.has_subscribed === true || user.is_subscribed === true) return true;
+  if (user.subscription_expires_at) return true;
+  return ["daily", "weekly", "monthly"].includes(user.subscription_plan);
+}
+
+function canUseFreeChats(user) {
+  return !isSubscribed(user) && !hasEverSubscribed(user);
 }
 
 function mockReply(message) {
@@ -198,6 +210,7 @@ async function activateSubscription(uid, plan) {
   await db.collection("users").doc(uid).set(
     {
       is_subscribed: true,
+      has_subscribed: true,
       chat_count: 0,
       subscription_plan: plan,
       subscription_expires_at: getSubscriptionExpiry(plan),
@@ -227,12 +240,13 @@ exports.chatSend = onRequest({ region: REGION, cors: true }, async (req, res) =>
     const user = userSnap.exists ? userSnap.data() : {};
     const chatCount = user.chat_count || 0;
     const subscribed = isSubscribed(user);
+    const freeChatEligible = canUseFreeChats(user);
 
-    if (!subscribed && chatCount >= FREE_CHAT_LIMIT) {
+    if (!subscribed && (!freeChatEligible || chatCount >= FREE_CHAT_LIMIT)) {
       return res.status(403).json({
         status: "error",
         limit_reached: true,
-        message: "Free chat limit reached. Subscribe to continue.",
+        message: "Subscribe to continue chatting.",
         chat_count: chatCount,
         limit: FREE_CHAT_LIMIT,
       });
@@ -290,14 +304,16 @@ exports.chatStatus = onRequest({ region: REGION, cors: true }, async (req, res) 
     const user = userSnap.data() || {};
     const chatCount = user.chat_count || 0;
     const subscribed = isSubscribed(user);
+    const freeChatEligible = canUseFreeChats(user);
 
     return res.json({
       status: "success",
       chat_count: chatCount,
       limit: FREE_CHAT_LIMIT,
       is_subscribed: subscribed,
-      limit_reached: !subscribed && chatCount >= FREE_CHAT_LIMIT,
-      remaining: Math.max(0, FREE_CHAT_LIMIT - chatCount),
+      free_chat_eligible: freeChatEligible,
+      limit_reached: !subscribed && (!freeChatEligible || chatCount >= FREE_CHAT_LIMIT),
+      remaining: freeChatEligible ? Math.max(0, FREE_CHAT_LIMIT - chatCount) : 0,
     });
   } catch (error) {
     return res.status(error.status || 500).json({

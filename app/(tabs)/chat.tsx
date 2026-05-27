@@ -80,11 +80,13 @@ const PLANS = [
 function SubscribeModal({
   visible,
   remaining,
+  freeChatEligible,
   onClose,
   onSubscribe,
 }: {
   visible: boolean;
   remaining: number;
+  freeChatEligible: boolean;
   onClose: () => void;
   onSubscribe: (plan: string) => void;
 }) {
@@ -100,7 +102,9 @@ function SubscribeModal({
             <Text style={styles.modalLock}>🔒</Text>
             <Text style={styles.modalTitle}>Unlock Full AI Chat</Text>
             <Text style={styles.modalSub}>
-              {remaining === 0
+              {!freeChatEligible
+                ? 'Your subscription has ended. Renew to continue chatting.'
+                : remaining === 0
                 ? 'You have used all your free chats.'
                 : `Only ${remaining} free chat${remaining !== 1 ? 's' : ''} remaining.`}
             </Text>
@@ -405,6 +409,7 @@ export default function ChatScreen() {
       <SubscribeModal
         visible={showModal}
         remaining={chatStatus?.remaining ?? 0}
+        freeChatEligible={chatStatus?.free_chat_eligible ?? true}
         onClose={() => setShowModal(false)}
         onSubscribe={handleSubscribe}
       />

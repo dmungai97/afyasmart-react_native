@@ -10,7 +10,11 @@ import {
   updateDoc,
 } from "firebase/firestore";
 import { firebaseAuth, firestore } from "./firebase";
-import { FREE_CHAT_LIMIT, isSubscriptionActive } from "./subscription.model";
+import {
+  FREE_CHAT_LIMIT,
+  canUseFreeChats,
+  isSubscriptionActive,
+} from "./subscription.model";
 
 export interface ChatMessage {
   role: "user" | "ai";
@@ -28,6 +32,7 @@ export interface ChatStatusResponse {
   chat_count: number;
   limit: number;
   is_subscribed: boolean;
+  free_chat_eligible: boolean;
   limit_reached: boolean;
   remaining: number;
 }
@@ -76,13 +81,17 @@ export const getChatStatus = async (
   const user = await getCurrentUserProfile();
   const chatCount = user?.chat_count ?? 0;
   const isSubscribed = isSubscriptionActive(user);
+  const freeChatEligible = canUseFreeChats(user);
 
   return {
     chat_count: chatCount,
     limit: FREE_CHAT_LIMIT,
     is_subscribed: isSubscribed,
-    limit_reached: !isSubscribed && chatCount >= FREE_CHAT_LIMIT,
-    remaining: isSubscribed ? FREE_CHAT_LIMIT : Math.max(0, FREE_CHAT_LIMIT - chatCount),
+    free_chat_eligible: freeChatEligible,
+    limit_reached: !isSubscribed && (!freeChatEligible || chatCount >= FREE_CHAT_LIMIT),
+    remaining: isSubscribed || freeChatEligible
+      ? Math.max(0, FREE_CHAT_LIMIT - chatCount)
+      : 0,
   };
 };
 

@@ -6,16 +6,29 @@ const { getFirestore } = require("firebase-admin/firestore");
 const projectRoot = path.resolve(__dirname, "..");
 const seedDir = path.join(projectRoot, "seed-data");
 
+function getProjectId() {
+  if (process.env.GCLOUD_PROJECT || process.env.GOOGLE_CLOUD_PROJECT) {
+    return process.env.GCLOUD_PROJECT || process.env.GOOGLE_CLOUD_PROJECT;
+  }
+
+  const rcPath = path.join(projectRoot, ".firebaserc");
+  if (!fs.existsSync(rcPath)) return undefined;
+
+  const rc = JSON.parse(fs.readFileSync(rcPath, "utf8"));
+  return rc.projects?.default;
+}
+
 function initializeAdmin() {
   const serviceAccountPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+  const projectId = getProjectId();
 
   if (serviceAccountPath) {
     const serviceAccount = require(path.resolve(serviceAccountPath));
-    initializeApp({ credential: cert(serviceAccount) });
+    initializeApp({ credential: cert(serviceAccount), projectId });
     return;
   }
 
-  initializeApp({ credential: applicationDefault() });
+  initializeApp({ credential: applicationDefault(), projectId });
 }
 
 function stableId(item, fallback) {

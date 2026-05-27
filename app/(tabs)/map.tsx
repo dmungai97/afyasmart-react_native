@@ -6,6 +6,8 @@ import {
 import MapView, { Marker, PROVIDER_GOOGLE, Circle } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
+import { fetchNearbyDoctors } from '../../src/services/doctor.service';
+import { getPharmacies } from '../../src/services/pharmacy.service';
 
 const TEAL  = '#0B6E6E';
 const RED   = '#DC2626';
@@ -20,7 +22,7 @@ type Centre = {
   open: boolean;
   closes: string;
   subscribed?: boolean;
-  source?: 'osm';
+  source?: 'osm' | 'seed';
 };
 
 type OsmElement = {
@@ -53,6 +55,7 @@ const TYPE_CONFIG: Record<string, { color: string; bg: string; icon: keyof typeo
 const FILTER_TABS = ['Care', 'Hospitals', 'Clinics', 'All', 'Pharmacies', 'Doctors'];
 
 const SEARCH_RADIUS_METRES = 25000;
+const DEFAULT_LOCATION = { latitude: -1.286389, longitude: 36.817223 };
 const OVERPASS_ENDPOINTS = [
   'https://overpass-api.de/api/interpreter',
   'https://overpass.kumi.systems/api/interpreter',
@@ -224,6 +227,64 @@ async function fetchNominatimHealthCentres(
   return centres;
 }
 
+async function fetchSeededHealthCentres(
+  coords?: { latitude: number; longitude: number } | null,
+): Promise<Centre[]> {
+  const [doctorsResult, pharmaciesResult] = await Promise.all([
+    fetchNearbyDoctors('', {
+      ...(coords
+        ? {
+            lat: coords.latitude,
+            lng: coords.longitude,
+            radius: 500,
+          }
+        : {}),
+    }),
+    getPharmacies(''),
+  ]);
+
+  const doctors: Centre[] = doctorsResult.data
+    .filter((doctor) => doctor.latitude && doctor.longitude)
+    .map((doctor) => ({
+      id: `doctor-${doctor.id}`,
+      name: doctor.name,
+      type: 'Doctor' as const,
+      lat: doctor.latitude,
+      lng: doctor.longitude,
+      open: doctor.available,
+      closes: doctor.availability || 'Availability varies',
+      subscribed: true,
+      source: 'seed' as const,
+    }));
+
+  const pharmacies: Centre[] = pharmaciesResult.data
+    .filter((pharmacy: any) => pharmacy.latitude && pharmacy.longitude)
+    .map((pharmacy: any) => ({
+      id: `pharmacy-${pharmacy.id}`,
+      name: pharmacy.name,
+      type: 'Pharmacy' as const,
+      lat: pharmacy.latitude,
+      lng: pharmacy.longitude,
+      open: pharmacy.open,
+      closes: pharmacy.opening_hours || 'Hours vary',
+      subscribed: true,
+      source: 'seed' as const,
+    }));
+
+  return [...doctors, ...pharmacies];
+}
+
+function mergeCentres(primary: Centre[], fallback: Centre[]) {
+  const seen = new Set<string>();
+
+  return [...primary, ...fallback].filter((centre) => {
+    const key = `${centre.name.toLowerCase()}-${centre.lat.toFixed(4)}-${centre.lng.toFixed(4)}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 export default function MapScreen() {
   const mapRef = useRef<MapView>(null);
   const [userLocation, setUserLocation]     = useState<{ latitude: number; longitude: number } | null>(null);
@@ -240,10 +301,17 @@ export default function MapScreen() {
     (async () => {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
+        const seedCentres = await fetchSeededHealthCentres(DEFAULT_LOCATION);
+        const withDistance = seedCentres.map(c => ({
+          ...c,
+          distance: getDistance(DEFAULT_LOCATION.latitude, DEFAULT_LOCATION.longitude, c.lat, c.lng),
+        })).sort((a, b) => a.distance - b.distance);
+
         setPermissionDenied(true);
-        setLookupError('Location permission is off.');
+        setUserLocation(DEFAULT_LOCATION);
+        setLookupError('Location permission is off. Showing seeded Kenya services.');
         setLoading(false);
-        setCentres([]);
+        setCentres(withDistance);
         return;
       }
       try {
@@ -269,13 +337,16 @@ export default function MapScreen() {
           nearbyCentres = nominatimCentres;
         }
 
+        const seedCentres = await fetchSeededHealthCentres(coords);
+        nearbyCentres = mergeCentres(nearbyCentres, seedCentres);
+
         setLookupError(
           nearbyCentres.length > 0
             ? null
             : nearbyLookupFailed
-            ? 'Nearby lookup failed. Check your internet connection and try again.'
+            ? 'Live nearby lookup failed. Showing seeded Kenya services.'
             : nearbyCentres.length === 0
-            ? 'No mapped health centres were found around your current location.'
+            ? 'No seeded or mapped health centres were found.'
             : null
         );
 
@@ -292,8 +363,15 @@ export default function MapScreen() {
           longitudeDelta: 0.05,
         }, 1000);
       } catch {
-        setLookupError('Could not get your current location.');
-        setCentres([]);
+        const seedCentres = await fetchSeededHealthCentres(DEFAULT_LOCATION);
+        const withDistance = seedCentres.map(c => ({
+          ...c,
+          distance: getDistance(DEFAULT_LOCATION.latitude, DEFAULT_LOCATION.longitude, c.lat, c.lng),
+        })).sort((a, b) => a.distance - b.distance);
+
+        setUserLocation(DEFAULT_LOCATION);
+        setLookupError('Could not get your current location. Showing seeded Kenya services.');
+        setCentres(withDistance);
       } finally {
         setLoading(false);
       }
@@ -449,7 +527,7 @@ export default function MapScreen() {
             initialRegion={
               userLocation
                 ? { ...userLocation, latitudeDelta: 0.08, longitudeDelta: 0.08 }
-                : { latitude: -1.286389, longitude: 36.817223, latitudeDelta: 0.25, longitudeDelta: 0.25 }
+                : { ...DEFAULT_LOCATION, latitudeDelta: 0.25, longitudeDelta: 0.25 }
             }
             showsUserLocation={Boolean(userLocation)}
             showsMyLocationButton={false}
