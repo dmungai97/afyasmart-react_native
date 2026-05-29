@@ -78,6 +78,11 @@ export default function LoginScreen() {
       await completeOnboarding();
     }
 
+    if (data.user.role === 'admin' || data.user.role === 'super_admin') {
+      router.replace('/admin' as any);
+      return;
+    }
+
     router.replace('/(tabs)' as any);
   }, [completeOnboarding, plan, router, setAuth]);
 

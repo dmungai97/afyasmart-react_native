@@ -14,6 +14,7 @@ export interface AuthUser {
   name: string;
   email: string;
   phone?: string;
+  role?: "user" | "admin" | "super_admin";
   is_subscribed: boolean;
   has_subscribed: boolean;
   onboarding_completed: boolean;
@@ -38,6 +39,7 @@ const defaultUser = (
   name,
   email,
   phone: phone ?? "",
+  role: "user",
   is_subscribed: false,
   has_subscribed: false,
   onboarding_completed: false,
@@ -58,6 +60,7 @@ export const normalizeUser = (id: string, data: any): AuthUser => ({
   name: data?.name ?? data?.displayName ?? "AfyaSmart User",
   email: data?.email ?? "",
   phone: data?.phone ?? undefined,
+  role: data?.role === "admin" || data?.role === "super_admin" ? data.role : "user",
   is_subscribed: Boolean(data?.is_subscribed),
   has_subscribed: Boolean(
     data?.has_subscribed

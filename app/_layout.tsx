@@ -9,13 +9,27 @@ export default function RootLayout() {
   const hasCompletedOnboarding = useAuthStore((s) => s.hasCompletedOnboarding);
   const isNewUser = useAuthStore((s) => s.isNewUser);
   const loadAuth = useAuthStore((s) => s.loadAuth);
+  const refreshUser = useAuthStore((s) => s.refreshUser);
   const segments = useSegments();
   const router = useRouter();
   const [authLoaded, setAuthLoaded] = useState(false);
 
   useEffect(() => {
-    loadAuth().then(() => setAuthLoaded(true));
-  }, [loadAuth]);
+    let mounted = true;
+
+    loadAuth()
+      .then(async () => {
+        const currentToken = useAuthStore.getState().token;
+        if (currentToken) await refreshUser(currentToken);
+      })
+      .finally(() => {
+        if (mounted) setAuthLoaded(true);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [loadAuth, refreshUser]);
 
   useEffect(() => {
     if (!authLoaded) return;
@@ -61,16 +75,33 @@ export default function RootLayout() {
       "symptoms",
     ].includes(current);
     const inSubscription = first === "subscription" || current === "subscription";
+    const inAdmin = first === "admin";
     const onWelcome = first === "welcome" || current === "welcome";
     const onRoot = first === "index" || first === "";
     const premiumRoutes = ["diagnosis-results", "doctors", "drugs", "map", "pharmacy", "symptoms"];
     const hasFullAccess = isSubscriptionActive(user);
+    const isAdmin = user?.role === "admin" || user?.role === "super_admin";
     const needsOnboarding =
       isNewUser && !hasCompletedOnboarding && !user?.onboarding_completed;
 
     if (!token) {
+      if (inAdmin) {
+        router.replace("/(auth)/login" as any);
+        return;
+      }
+
       if (!inAuth && !inOnboarding && !onRoot && !onWelcome)
         router.replace("/(onboarding)/welcome" as any);
+      return;
+    }
+
+    if (inAdmin) {
+      if (!isAdmin) router.replace("/(tabs)" as any);
+      return;
+    }
+
+    if (isAdmin && (inAuth || onRoot || inTabs || inOnboarding)) {
+      router.replace("/admin" as any);
       return;
     }
 

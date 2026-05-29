@@ -2,8 +2,15 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    function isAdmin() {
+      return request.auth != null
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role
+          in ["admin", "super_admin"];
+    }
+
     match /users/{userId} {
-      allow read, update: if request.auth != null && request.auth.uid == userId;
+      allow read: if request.auth != null && (request.auth.uid == userId || isAdmin());
+      allow update: if request.auth != null && (request.auth.uid == userId || isAdmin());
       allow create: if request.auth != null && request.auth.uid == userId;
 
       match /chatMessages/{messageId} {
@@ -32,7 +39,7 @@ service cloud.firestore {
     }
 
     match /paymentRequests/{checkoutRequestId} {
-      allow read: if request.auth != null && resource.data.uid == request.auth.uid;
+      allow read: if request.auth != null && (resource.data.uid == request.auth.uid || isAdmin());
       allow create: if request.auth != null
         && request.resource.data.uid == request.auth.uid;
       allow update: if request.auth != null

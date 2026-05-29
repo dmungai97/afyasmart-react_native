@@ -6,6 +6,7 @@ type User = {
   name: string;
   email: string;
   phone?: string;
+  role?: "user" | "admin" | "super_admin";
   is_subscribed: boolean;
   has_subscribed: boolean;
   onboarding_completed: boolean;

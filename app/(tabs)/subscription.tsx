@@ -12,6 +12,8 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { doc, onSnapshot } from "firebase/firestore";
+import { firestore } from "../../src/services/firebase";
 import {
   checkLatestMpesaPayment,
   initiateMpesa,
@@ -119,6 +121,8 @@ export default function SubscriptionScreen() {
   const [pollCount, setPollCount] = useState(0);
   const [checkingPayment, setCheckingPayment] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const unsubscribeRef = useRef<(() => void) | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Auto-open payment modal when navigated from chat
   useEffect(() => {
@@ -131,10 +135,12 @@ export default function SubscriptionScreen() {
     }
   }, [planParam]);
 
-  // ── Cleanup polling on unmount ──
+  // ── Cleanup polling and listeners on unmount ──
   useEffect(() => {
     return () => {
       if (pollRef.current !== null) clearInterval(pollRef.current);
+      if (unsubscribeRef.current !== null) unsubscribeRef.current();
+      if (timeoutRef.current !== null) clearTimeout(timeoutRef.current);
     };
   }, []);
 
@@ -160,7 +166,7 @@ export default function SubscriptionScreen() {
     try {
       const data = await initiateMpesa(token, phone.trim(), selectedPlan.id);
       setCheckoutId(data.checkout_request_id);
-      startPolling(data.checkout_request_id);
+      startListening(data.checkout_request_id);
     } catch (err: any) {
       setPayStep("failed");
       Alert.alert(
@@ -171,23 +177,72 @@ export default function SubscriptionScreen() {
     }
   };
 
-  // ── Step 2: Poll every 3s for up to 90s ───────────────────────
-  const startPolling = (id: string) => {
-    let count = 0;
-    const MAX = 30; // 30 × 3s = 90s timeout
+  // ── Step 2: Listen in real-time for status updates up to 90s ──
+  const startListening = (id: string) => {
+    if (unsubscribeRef.current !== null) {
+      unsubscribeRef.current();
+      unsubscribeRef.current = null;
+    }
+    if (timeoutRef.current !== null) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+    if (pollRef.current !== null) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
 
-    pollRef.current = setInterval(async () => {
+    setPollCount(0);
+    let count = 0;
+
+    const timerInterval = setInterval(() => {
       count++;
       setPollCount(count);
+      if (count >= 30) {
+        clearInterval(timerInterval);
+      }
+    }, 3000);
+    pollRef.current = timerInterval;
 
-      try {
-        const result = await pollMpesaStatus(token, id);
+    timeoutRef.current = setTimeout(() => {
+      if (unsubscribeRef.current !== null) {
+        unsubscribeRef.current();
+        unsubscribeRef.current = null;
+      }
+      if (pollRef.current !== null) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+      setPayStep("failed");
+      Alert.alert(
+        "Payment Timeout",
+        "We did not receive payment confirmation. If you paid, please contact support.",
+      );
+    }, 90000);
 
-        if (result.paid) {
-          clearInterval(pollRef.current!);
+    const docRef = doc(firestore, "paymentRequests", id);
+    const unsubscribe = onSnapshot(
+      docRef,
+      async (snapshot) => {
+        if (!snapshot.exists()) return;
+        const data = snapshot.data();
+
+        if (data.paid === true || data.status === "paid") {
+          if (unsubscribeRef.current !== null) {
+            unsubscribeRef.current();
+            unsubscribeRef.current = null;
+          }
+          if (timeoutRef.current !== null) {
+            clearTimeout(timeoutRef.current);
+            timeoutRef.current = null;
+          }
+          if (pollRef.current !== null) {
+            clearInterval(pollRef.current);
+            pollRef.current = null;
+          }
+
           setPayStep("confirmed");
 
-          // Sync store from server (most accurate)
           if (token) {
             try {
               await refreshUser(token);
@@ -200,33 +255,59 @@ export default function SubscriptionScreen() {
             setShowPayment(false);
             setTimeout(() => setShowSuccess(true), 300);
           }, 1000);
-          return;
-        }
-
-        if (result.status === "cancelled") {
-          clearInterval(pollRef.current!);
+        } else if (data.status === "cancelled") {
+          if (unsubscribeRef.current !== null) {
+            unsubscribeRef.current();
+            unsubscribeRef.current = null;
+          }
+          if (timeoutRef.current !== null) {
+            clearTimeout(timeoutRef.current);
+            timeoutRef.current = null;
+          }
+          if (pollRef.current !== null) {
+            clearInterval(pollRef.current);
+            pollRef.current = null;
+          }
           setPayStep("failed");
           Alert.alert("Payment Cancelled", "You cancelled the M-Pesa request.");
-          return;
+        } else if (data.status === "failed") {
+          if (unsubscribeRef.current !== null) {
+            unsubscribeRef.current();
+            unsubscribeRef.current = null;
+          }
+          if (timeoutRef.current !== null) {
+            clearTimeout(timeoutRef.current);
+            timeoutRef.current = null;
+          }
+          if (pollRef.current !== null) {
+            clearInterval(pollRef.current);
+            pollRef.current = null;
+          }
+          setPayStep("failed");
+          Alert.alert("Payment Failed", "M-Pesa payment failed.");
         }
-      } catch {
-        // network blip — keep polling
+      },
+      (error) => {
+        console.error("Firestore onSnapshot error in SubscriptionScreen:", error);
       }
+    );
 
-      // Timeout
-      if (count >= MAX) {
-        clearInterval(pollRef.current!);
-        setPayStep("failed");
-        Alert.alert(
-          "Payment Timeout",
-          "We did not receive payment confirmation. If you paid, please contact support.",
-        );
-      }
-    }, 3000);
+    unsubscribeRef.current = unsubscribe;
   };
 
   const handleRetry = () => {
-    if (pollRef.current !== null) clearInterval(pollRef.current);
+    if (pollRef.current !== null) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+    if (unsubscribeRef.current !== null) {
+      unsubscribeRef.current();
+      unsubscribeRef.current = null;
+    }
+    if (timeoutRef.current !== null) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
     setPayStep("form");
     setCheckoutId(null);
     setPollCount(0);
@@ -247,7 +328,18 @@ export default function SubscriptionScreen() {
       }
 
       if (result.paid) {
-        if (pollRef.current !== null) clearInterval(pollRef.current);
+        if (pollRef.current !== null) {
+          clearInterval(pollRef.current);
+          pollRef.current = null;
+        }
+        if (unsubscribeRef.current !== null) {
+          unsubscribeRef.current();
+          unsubscribeRef.current = null;
+        }
+        if (timeoutRef.current !== null) {
+          clearTimeout(timeoutRef.current);
+          timeoutRef.current = null;
+        }
         setPayStep("confirmed");
 
         if (token) {
@@ -266,6 +358,18 @@ export default function SubscriptionScreen() {
       }
 
       if (result.status === "cancelled") {
+        if (pollRef.current !== null) {
+          clearInterval(pollRef.current);
+          pollRef.current = null;
+        }
+        if (unsubscribeRef.current !== null) {
+          unsubscribeRef.current();
+          unsubscribeRef.current = null;
+        }
+        if (timeoutRef.current !== null) {
+          clearTimeout(timeoutRef.current);
+          timeoutRef.current = null;
+        }
         setPayStep("failed");
         Alert.alert("Payment Cancelled", "M-Pesa shows this request was cancelled.");
         return;
