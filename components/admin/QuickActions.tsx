@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 const BLUE = "#3B82F6";
@@ -11,43 +12,59 @@ const BORDER = "#F1F5F9";
 const TEXT_DARK = "#0F172A";
 const TEXT_MUTED = "#64748B";
 
+const STRINGS = {
+  quickActions: "Quick Actions",
+  meta: "Common administrative workflows",
+  addFacility: "Add New Facility",
+  addFacilitySub: "Pharmacy, Doctor or Hospital",
+  approveFacilities: "Approve Facilities",
+  approveFacilitiesSub: "Review pending requests",
+  removeFacility: "Remove Facility",
+  removeFacilitySub: "Delete inactive facilities",
+  viewPayouts: "View Payouts",
+  viewPayoutsSub: "Check pending payouts",
+  viewUsers: "Manage Users",
+  viewUsersSub: "View subscriptions & roles",
+  viewTransactions: "View Transactions",
+  viewTransactionsSub: "Detailed payment log",
+};
+
 type IconName = keyof typeof Ionicons.glyphMap;
 
 export default function QuickActions() {
-  const actionsList = [
-    ["add-circle", "Add New Facility", "Pharmacy, Doctor or Hospital", BLUE],
-    ["checkmark-circle", "Approve Facilities", "Review pending requests", GREEN],
-    ["trash", "Remove Facility", "Delete inactive facilities", RED],
-    ["time", "View Payouts", "Check pending payouts", ORANGE],
-    ["document-text", "Generate Report", "Financial and facility reports", PURPLE],
-    ["bar-chart", "View Analytics", "Detailed platform insights", CYAN],
+  const router = useRouter();
+
+  const actionsList: [IconName, string, string, string, string][] = [
+    ["add-circle", STRINGS.addFacility, STRINGS.addFacilitySub, BLUE, "/admin/facilities"],
+    ["business-outline", STRINGS.approveFacilities, STRINGS.approveFacilitiesSub, GREEN, "/admin/facilities"],
+    ["trash", STRINGS.removeFacility, STRINGS.removeFacilitySub, RED, "/admin/facilities"],
+    ["card-outline", STRINGS.viewPayouts, STRINGS.viewPayoutsSub, ORANGE, "/admin/transactions"],
+    ["people-outline", STRINGS.viewUsers, STRINGS.viewUsersSub, PURPLE, "/admin/users"],
+    ["receipt-outline", STRINGS.viewTransactions, STRINGS.viewTransactionsSub, CYAN, "/admin/transactions"],
   ];
 
   return (
     <View style={styles.quickActions}>
       <View style={styles.quickHeader}>
-        <Text style={styles.panelTitle}>Quick Actions</Text>
-        <Text style={styles.sectionMeta}>Common administrative workflows</Text>
+        <Text style={styles.panelTitle}>{STRINGS.quickActions}</Text>
+        <Text style={styles.sectionMeta}>{STRINGS.meta}</Text>
       </View>
       <View style={styles.grid}>
-        {actionsList.map(([icon, title, sub, color]) => (
+        {actionsList.map(([icon, title, sub, color, route]) => (
           <TouchableOpacity
             key={title}
             style={styles.actionCard}
-            onPress={() => {}}
+            onPress={() => router.push(route as any)}
             activeOpacity={0.7}
           >
             <View style={[styles.actionIcon, { backgroundColor: `${color}10` }]}>
-              <Ionicons
-                name={icon as IconName}
-                size={18}
-                color={color as string}
-              />
+              <Ionicons name={icon} size={18} color={color} />
             </View>
             <View style={styles.textContainer}>
               <Text style={styles.actionTitle}>{title}</Text>
               <Text style={styles.actionSub}>{sub}</Text>
             </View>
+            <Ionicons name="chevron-forward-outline" size={14} color={TEXT_MUTED} />
           </TouchableOpacity>
         ))}
       </View>

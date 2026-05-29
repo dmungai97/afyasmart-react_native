@@ -12,6 +12,7 @@ service cloud.firestore {
       allow read: if request.auth != null && (request.auth.uid == userId || isAdmin());
       allow update: if request.auth != null && (request.auth.uid == userId || isAdmin());
       allow create: if request.auth != null && request.auth.uid == userId;
+      allow list: if isAdmin();
 
       match /chatMessages/{messageId} {
         allow read, write: if request.auth != null && request.auth.uid == userId;
@@ -25,26 +26,28 @@ service cloud.firestore {
 
     match /doctors/{doctorId} {
       allow read: if request.auth != null;
-      allow write: if false;
+      allow create, update, delete: if isAdmin();
     }
 
     match /drugs/{drugId} {
       allow read: if request.auth != null;
-      allow write: if false;
+      allow create, update, delete: if isAdmin();
     }
 
     match /pharmacies/{pharmacyId} {
       allow read: if request.auth != null;
-      allow write: if false;
+      allow create, update, delete: if isAdmin();
     }
 
     match /paymentRequests/{checkoutRequestId} {
       allow read: if request.auth != null && (resource.data.uid == request.auth.uid || isAdmin());
+      allow list: if isAdmin();
       allow create: if request.auth != null
         && request.resource.data.uid == request.auth.uid;
-      allow update: if request.auth != null
+      allow update: if (request.auth != null
         && resource.data.uid == request.auth.uid
-        && request.resource.data.uid == resource.data.uid;
+        && request.resource.data.uid == resource.data.uid)
+        || isAdmin();
       allow delete: if false;
     }
   }

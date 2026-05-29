@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { usePathname, useRouter } from "expo-router";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 const DARK_BG = "#0B0F19";
@@ -13,6 +14,69 @@ interface SidebarProps {
   isMobile?: boolean;
   onClose?: () => void;
 }
+
+const STRINGS = {
+  brand: "AfyaSmart",
+  brandSub: "Admin Console",
+  dashboard: "Dashboard",
+  facilityMgmt: "Facility Management",
+  facilityApprovals: "Facility Approvals",
+  allFacilities: "All Facilities",
+  addFacility: "Add Facility",
+  removeFacility: "Remove Facility",
+  financialMgmt: "Financial Management",
+  revenueIncome: "Revenue & Income",
+  payouts: "Payouts",
+  commissions: "Commissions",
+  transactions: "Transactions",
+  userMgmt: "User Management",
+  allUsers: "All Users",
+  system: "System",
+  notifications: "Notifications",
+  settings: "System Settings",
+  superAdmin: "Super Administrator",
+};
+
+type NavItem = {
+  icon: IconName;
+  label: string;
+  route: string;
+  badge?: string;
+};
+
+type NavSection = {
+  header: string;
+  items: NavItem[];
+};
+
+const NAV: NavSection[] = [
+  {
+    header: "",
+    items: [
+      { icon: "grid", label: STRINGS.dashboard, route: "/admin" },
+    ],
+  },
+  {
+    header: STRINGS.facilityMgmt,
+    items: [
+      { icon: "business-outline", label: STRINGS.allFacilities, route: "/admin/facilities" },
+      { icon: "add-circle-outline", label: STRINGS.addFacility, route: "/admin/facilities?action=add" },
+    ],
+  },
+  {
+    header: STRINGS.userMgmt,
+    items: [
+      { icon: "people-outline", label: STRINGS.allUsers, route: "/admin/users" },
+    ],
+  },
+  {
+    header: STRINGS.financialMgmt,
+    items: [
+      { icon: "analytics-outline", label: STRINGS.revenueIncome, route: "/admin/transactions" },
+      { icon: "receipt-outline", label: STRINGS.transactions, route: "/admin/transactions" },
+    ],
+  },
+];
 
 function SidebarItem({
   icon,
@@ -30,7 +94,7 @@ function SidebarItem({
   return (
     <TouchableOpacity
       style={[styles.sideItem, active && styles.sideItemActive]}
-      onPress={onPress || (() => {})}
+      onPress={onPress ?? (() => {})}
       activeOpacity={0.7}
     >
       <Ionicons name={icon} size={18} color={active ? "#fff" : "#94A3B8"} />
@@ -41,17 +105,35 @@ function SidebarItem({
 }
 
 export default function Sidebar({ userName, onSignOut, isMobile, onClose }: SidebarProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+
+  const navigate = (route: string) => {
+    if (onClose) onClose();
+    if (route.includes("?action=add")) {
+      router.push("/admin/facilities" as any);
+    } else {
+      router.push(route as any);
+    }
+  };
+
+  const isActive = (route: string) => {
+    const base = route.split("?")[0];
+    if (base === "/admin") return pathname === "/admin";
+    return pathname.startsWith(base);
+  };
+
   return (
     <View style={[styles.sidebar, isMobile && styles.sidebarMobile]}>
-      {/* Brand row with optional Close button on mobile */}
+      {/* Brand row */}
       <View style={styles.brandRow}>
         <View style={styles.brandLeft}>
           <View style={styles.logo}>
             <Ionicons name="heart" size={20} color="#fff" />
           </View>
           <View>
-            <Text style={styles.brand}>AfyaSmart</Text>
-            <Text style={styles.brandSub}>Admin Console</Text>
+            <Text style={styles.brand}>{STRINGS.brand}</Text>
+            <Text style={styles.brandSub}>{STRINGS.brandSub}</Text>
           </View>
         </View>
         {isMobile && onClose && (
@@ -61,30 +143,35 @@ export default function Sidebar({ userName, onSignOut, isMobile, onClose }: Side
         )}
       </View>
 
+      {/* Nav Sections */}
       <View style={styles.navGroup}>
-        <SidebarItem icon="grid" label="Dashboard" active onPress={isMobile ? onClose : undefined} />
-        <Text style={styles.navHeader}>Facility Management</Text>
-        <SidebarItem icon="shield-checkmark-outline" label="Facility Approvals" badge="0" onPress={isMobile ? onClose : undefined} />
-        <SidebarItem icon="business-outline" label="All Facilities" onPress={isMobile ? onClose : undefined} />
-        <SidebarItem icon="add-circle-outline" label="Add Facility" onPress={isMobile ? onClose : undefined} />
-        <SidebarItem icon="trash-outline" label="Remove Facility" onPress={isMobile ? onClose : undefined} />
-        <Text style={styles.navHeader}>Financial Management</Text>
-        <SidebarItem icon="analytics-outline" label="Revenue & Income" onPress={isMobile ? onClose : undefined} />
-        <SidebarItem icon="card-outline" label="Payouts" onPress={isMobile ? onClose : undefined} />
-        <SidebarItem icon="cash-outline" label="Commissions" onPress={isMobile ? onClose : undefined} />
-        <SidebarItem icon="receipt-outline" label="Transactions" onPress={isMobile ? onClose : undefined} />
-        <Text style={styles.navHeader}>System</Text>
-        <SidebarItem icon="notifications-outline" label="Notifications" badge="8" onPress={isMobile ? onClose : undefined} />
-        <SidebarItem icon="settings-outline" label="System Settings" onPress={isMobile ? onClose : undefined} />
+        {NAV.map((section) => (
+          <View key={section.header || "top"}>
+            {section.header ? (
+              <Text style={styles.navHeader}>{section.header}</Text>
+            ) : null}
+            {section.items.map((item) => (
+              <SidebarItem
+                key={item.label}
+                icon={item.icon}
+                label={item.label}
+                badge={item.badge}
+                active={isActive(item.route)}
+                onPress={() => navigate(item.route)}
+              />
+            ))}
+          </View>
+        ))}
       </View>
 
+      {/* Profile / Sign out */}
       <TouchableOpacity style={styles.adminProfile} onPress={onSignOut} activeOpacity={0.7}>
         <View style={styles.avatar}>
           <Text style={styles.avatarText}>{(userName?.[0] ?? "A").toUpperCase()}</Text>
         </View>
         <View style={styles.profileText}>
           <Text style={styles.profileName}>{userName ?? "Admin"}</Text>
-          <Text style={styles.profileRole}>Super Administrator</Text>
+          <Text style={styles.profileRole}>{STRINGS.superAdmin}</Text>
         </View>
         <Ionicons name="log-out-outline" size={16} color="#94A3B8" />
       </TouchableOpacity>
@@ -116,11 +203,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginBottom: 28,
   },
-  brandLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
+  brandLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
   logo: {
     width: 38,
     height: 38,
@@ -136,12 +219,8 @@ const styles = StyleSheet.create({
   },
   brand: { color: "#fff", fontSize: 20, fontWeight: "900", letterSpacing: 0.5 },
   brandSub: { color: "#64748B", fontSize: 11, marginTop: 1, fontWeight: "600" },
-  closeBtn: {
-    padding: 4,
-  },
-  navGroup: {
-    flex: 1,
-  },
+  closeBtn: { padding: 4 },
+  navGroup: { flex: 1 },
   navHeader: {
     color: "#475569",
     fontSize: 9,
@@ -168,7 +247,7 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 3,
   },
-  sideLabel: { color: "#94A3B8", fontSize: 13, fontWeight: "600" },
+  sideLabel: { color: "#94A3B8", fontSize: 13, fontWeight: "600", flex: 1 },
   sideLabelActive: { color: "#fff", fontWeight: "700" },
   badge: {
     color: "#fff",
@@ -179,7 +258,6 @@ const styles = StyleSheet.create({
     paddingVertical: 1.5,
     fontSize: 9,
     fontWeight: "900",
-    marginLeft: "auto",
   },
   adminProfile: {
     borderWidth: 1,
