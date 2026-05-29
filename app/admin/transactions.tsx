@@ -22,8 +22,8 @@ const BLUE = "#3B82F6";
 const GREEN = "#10B981";
 const RED = "#EF4444";
 const ORANGE = "#F59E0B";
-const BORDER = "#F1F5F9";
-const NAVY = "#0F172A";
+const BORDER = "#E2E8F0";
+const NAVY = "#1E293B";
 const MUTED = "#64748B";
 
 const STRINGS = {
@@ -151,12 +151,12 @@ export default function AdminTransactionsPage() {
           <View style={styles.titleRow}>
             {isMobile && (
               <TouchableOpacity style={styles.menuBtn} onPress={() => setMenuOpen(true)} activeOpacity={0.7}>
-                <Ionicons name="menu-outline" size={24} color="#0B0F19" />
+                <Ionicons name="menu-outline" size={24} color="#1E293B" />
               </TouchableOpacity>
             )}
             <View style={styles.backBtnWrap}>
               <TouchableOpacity style={styles.backBtn} onPress={() => router.push("/admin")} activeOpacity={0.7}>
-                <Ionicons name="arrow-back" size={18} color="#0B0F19" />
+                <Ionicons name="arrow-back" size={18} color="#1E293B" />
               </TouchableOpacity>
             </View>
             <View>
@@ -165,37 +165,37 @@ export default function AdminTransactionsPage() {
             </View>
           </View>
           <TouchableOpacity style={styles.refreshBtn} onPress={load} activeOpacity={0.8}>
-            <Ionicons name="refresh-outline" size={18} color={BLUE} />
+            <Ionicons name="refresh-outline" size={18} color="#1E293B" />
           </TouchableOpacity>
         </View>
 
         {/* KPI Summary */}
         <View style={styles.kpiRow}>
-          <View style={[styles.kpiCard, { borderLeftColor: GREEN, shadowColor: GREEN }]}>
+          <View style={styles.kpiCard}>
             <View style={styles.kpiContent}>
               <Text style={styles.kpiLabel}>{STRINGS.totalRevenue}</Text>
-              <Text style={[styles.kpiValue, { color: GREEN }]}>{formatMoney(totalRevenue)}</Text>
+              <Text style={styles.kpiValue}>{formatMoney(totalRevenue)}</Text>
             </View>
-            <View style={[styles.kpiIcon, { backgroundColor: `${GREEN}12`, borderColor: `${GREEN}30` }]}>
-              <Ionicons name="wallet" size={20} color={GREEN} />
+            <View style={styles.kpiIcon}>
+              <Ionicons name="wallet" size={20} color="#475569" />
             </View>
           </View>
-          <View style={[styles.kpiCard, { borderLeftColor: BLUE, shadowColor: BLUE }]}>
+          <View style={styles.kpiCard}>
             <View style={styles.kpiContent}>
               <Text style={styles.kpiLabel}>{STRINGS.totalPaid}</Text>
-              <Text style={[styles.kpiValue, { color: BLUE }]}>{totalPaid}</Text>
+              <Text style={styles.kpiValue}>{totalPaid}</Text>
             </View>
-            <View style={[styles.kpiIcon, { backgroundColor: `${BLUE}12`, borderColor: `${BLUE}30` }]}>
-              <Ionicons name="checkmark-circle" size={20} color={BLUE} />
+            <View style={styles.kpiIcon}>
+              <Ionicons name="checkmark-circle" size={20} color="#475569" />
             </View>
           </View>
-          <View style={[styles.kpiCard, { borderLeftColor: ORANGE, shadowColor: ORANGE }]}>
+          <View style={styles.kpiCard}>
             <View style={styles.kpiContent}>
               <Text style={styles.kpiLabel}>{STRINGS.totalPending}</Text>
-              <Text style={[styles.kpiValue, { color: ORANGE }]}>{totalPending}</Text>
+              <Text style={styles.kpiValue}>{totalPending}</Text>
             </View>
-            <View style={[styles.kpiIcon, { backgroundColor: `${ORANGE}12`, borderColor: `${ORANGE}30` }]}>
-              <Ionicons name="time" size={20} color={ORANGE} />
+            <View style={styles.kpiIcon}>
+              <Ionicons name="time" size={20} color="#475569" />
             </View>
           </View>
         </View>
@@ -231,7 +231,7 @@ export default function AdminTransactionsPage() {
 
         {/* Table */}
         {loading ? (
-          <ActivityIndicator size="large" color={BLUE} style={{ marginTop: 40 }} />
+          <ActivityIndicator size="large" color="#1E293B" style={{ marginTop: 40 }} />
         ) : filtered.length === 0 ? (
           <View style={styles.empty}>
             <Ionicons name="receipt-outline" size={48} color={MUTED} />
@@ -253,8 +253,8 @@ export default function AdminTransactionsPage() {
                   <Text style={styles.cellSub}>{p.createdAt}</Text>
                 </View>
                 <Text style={[styles.tdCell, { textTransform: "capitalize" }]}>{p.plan}</Text>
-                <Text style={[styles.tdCell, { color: GREEN, fontWeight: "800" }]}>{formatMoney(p.amount)}</Text>
-                <View style={[styles.statusBadge, { backgroundColor: statusBg(p) }]}>
+                <Text style={[styles.tdCell, { color: "#1E293B", fontWeight: "600" }]}>{formatMoney(p.amount)}</Text>
+                <View style={[styles.statusBadge, { backgroundColor: statusBg(p), borderColor: statusColor(p) + "30" }]}>
                   <Text style={[styles.statusText, { color: statusColor(p) }]}>{statusLabel(p)}</Text>
                 </View>
               </View>
@@ -267,7 +267,7 @@ export default function AdminTransactionsPage() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, flexDirection: "row", backgroundColor: "#F4F6FA" },
+  root: { flex: 1, flexDirection: "row", backgroundColor: "#F8FAFC" },
   main: { flex: 1 },
   content: { padding: 24, gap: 16 },
   backdrop: { position: "absolute", left: 0, top: 0, right: 0, bottom: 0, backgroundColor: "rgba(11,15,25,0.4)", zIndex: 998 },
@@ -287,33 +287,33 @@ const styles = StyleSheet.create({
     padding: 6,
   },
   menuBtn: { padding: 6 },
-  title: { color: "#0B0F19", fontSize: 24, fontWeight: "900", letterSpacing: -0.5 },
+  title: { color: "#1E293B", fontSize: 24, fontWeight: "700", letterSpacing: -0.5 },
   subtitle: { color: MUTED, fontSize: 13, marginTop: 4, fontWeight: "500" },
-  refreshBtn: { width: 38, height: 38, borderRadius: 12, backgroundColor: "#fff", borderWidth: 1, borderColor: BORDER, alignItems: "center", justifyContent: "center", shadowColor: "#0F172A", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.02, shadowRadius: 4 },
+  refreshBtn: { width: 38, height: 38, borderRadius: 10, backgroundColor: "#fff", borderWidth: 1, borderColor: BORDER, alignItems: "center", justifyContent: "center" },
   kpiRow: { flexDirection: "row", gap: 12, flexWrap: "wrap" },
-  kpiCard: { flex: 1, minWidth: 160, backgroundColor: "#fff", borderRadius: 16, padding: 18, borderWidth: 1, borderColor: BORDER, borderLeftWidth: 5, flexDirection: "row", alignItems: "center", justifyContent: "space-between", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 10, elevation: 3 },
+  kpiCard: { flex: 1, minWidth: 160, backgroundColor: "#fff", borderRadius: 12, padding: 18, borderWidth: 1, borderColor: BORDER, flexDirection: "row", alignItems: "center", justifyContent: "space-between", shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 8, elevation: 1 },
   kpiContent: { flex: 1, paddingRight: 10 },
-  kpiLabel: { color: MUTED, fontSize: 10, fontWeight: "800", textTransform: "uppercase", letterSpacing: 0.6 },
-  kpiValue: { fontSize: 22, fontWeight: "900", marginTop: 6, letterSpacing: -0.5 },
-  kpiIcon: { width: 40, height: 40, borderRadius: 12, borderWidth: 1, alignItems: "center", justifyContent: "center" },
-  searchRow: { flexDirection: "row", alignItems: "center", backgroundColor: "#fff", borderRadius: 12, borderWidth: 1, borderColor: BORDER, height: 44, gap: 8, shadowColor: "#3B82F6", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.03, shadowRadius: 8 },
-  searchInput: { flex: 1, color: "#0B0F19", fontSize: 13, fontWeight: "500", paddingRight: 12 },
+  kpiLabel: { color: MUTED, fontSize: 10, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.6 },
+  kpiValue: { color: "#1E293B", fontSize: 22, fontWeight: "700", marginTop: 6, letterSpacing: -0.5 },
+  kpiIcon: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center", backgroundColor: "#F1F5F9" },
+  searchRow: { flexDirection: "row", alignItems: "center", backgroundColor: "#fff", borderRadius: 10, borderWidth: 1, borderColor: BORDER, height: 44, gap: 8 },
+  searchInput: { flex: 1, color: "#1E293B", fontSize: 13, fontWeight: "500", paddingRight: 12 },
   filterRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, alignItems: "center" },
   filterChip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: "#fff", borderWidth: 1, borderColor: BORDER },
-  filterChipActive: { backgroundColor: BLUE, borderColor: BLUE },
-  filterChipText: { color: MUTED, fontSize: 12, fontWeight: "700" },
+  filterChipActive: { backgroundColor: "#1E293B", borderColor: "#1E293B" },
+  filterChipText: { color: MUTED, fontSize: 12, fontWeight: "600" },
   filterChipTextActive: { color: "#fff" },
   countText: { color: MUTED, fontSize: 11, fontWeight: "600", marginLeft: "auto" },
   empty: { alignItems: "center", paddingTop: 60, gap: 12 },
-  emptyText: { color: MUTED, fontSize: 15, fontWeight: "700" },
-  table: { backgroundColor: "#fff", borderRadius: 16, borderWidth: 1, borderColor: BORDER, overflow: "hidden", shadowColor: "#3B82F6", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.02, shadowRadius: 8 },
+  emptyText: { color: MUTED, fontSize: 15, fontWeight: "600" },
+  table: { backgroundColor: "#fff", borderRadius: 12, borderWidth: 1, borderColor: BORDER, overflow: "hidden", shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 8, elevation: 1 },
   tableHeader: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 12, backgroundColor: "#F8FAFC", borderBottomWidth: 1, borderBottomColor: BORDER },
-  thCell: { flex: 1, color: MUTED, fontSize: 10, fontWeight: "800", textTransform: "uppercase", letterSpacing: 0.5 },
+  thCell: { flex: 1, color: MUTED, fontSize: 10, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.5 },
   tableRow: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: "#F1F5F9" },
   tableRowAlt: { backgroundColor: "#FAFBFD" },
-  cellPrimary: { color: "#0B0F19", fontSize: 13, fontWeight: "700" },
-  cellSub: { color: MUTED, fontSize: 10, fontWeight: "500", marginTop: 2 },
+  cellPrimary: { color: "#1E293B", fontSize: 13, fontWeight: "600" },
+  cellSub: { color: "#94A3B8", fontSize: 10, fontWeight: "500", marginTop: 2 },
   tdCell: { flex: 1, color: MUTED, fontSize: 12, fontWeight: "600" },
   statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, borderWidth: 1, borderColor: "#E2E8F0" },
-  statusText: { fontSize: 10, fontWeight: "800" },
+  statusText: { fontSize: 10, fontWeight: "600" },
 });

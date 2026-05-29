@@ -1,12 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
-const GREEN = "#10B981";
-const BLUE = "#3B82F6";
-const PURPLE = "#8B5CF6";
-const BORDER = "#F1F5F9";
-const TEXT_DARK = "#0F172A";
-const TEXT_MUTED = "#64748B";
+const SLATE_DARK = "#1E293B";
+const SLATE_MID = "#475569";
+const SLATE_LIGHT = "#94A3B8";
+const BORDER = "#E2E8F0";
 
 type IconName = keyof typeof Ionicons.glyphMap;
 
@@ -45,14 +43,14 @@ export default function FacilitiesOverview({
           </View>
           <View style={styles.legend}>
             <View style={styles.legendItem}>
-              <View style={[styles.dot, { backgroundColor: BLUE }]} />
+              <View style={[styles.dot, { backgroundColor: SLATE_DARK }]} />
               <View>
                 <Text style={styles.legendLabel}>Pharmacies</Text>
                 <Text style={styles.legendValue}>{formatNumber(pharmacies)}</Text>
               </View>
             </View>
             <View style={styles.legendItem}>
-              <View style={[styles.dot, { backgroundColor: PURPLE }]} />
+              <View style={[styles.dot, { backgroundColor: SLATE_LIGHT }]} />
               <View>
                 <Text style={styles.legendLabel}>Doctors</Text>
                 <Text style={styles.legendValue}>{formatNumber(doctors)}</Text>
@@ -62,7 +60,7 @@ export default function FacilitiesOverview({
         </View>
         <TouchableOpacity style={styles.viewButton} onPress={() => {}} activeOpacity={0.7}>
           <Text style={styles.viewButtonText}>View All Facilities</Text>
-          <Ionicons name="arrow-forward" size={14} color={BLUE} />
+          <Ionicons name="chevron-forward" size={14} color="#3B82F6" />
         </TouchableOpacity>
       </View>
 
@@ -75,25 +73,21 @@ export default function FacilitiesOverview({
             [
               "Total Facilities",
               formatNumber(totalFacilities),
-              BLUE,
               "shield-checkmark-outline",
             ],
-            ["Total Users", formatNumber(totalUsers), GREEN, "people-outline"],
-            ["Drug Records", formatNumber(drugs), PURPLE, "medical-outline"],
-            ["Subscriptions", formatNumber(subscriptions), "#F59E0B", "card-outline"],
-          ].map(([label, value, color, icon]) => (
-            <View key={label} style={styles.statusRow}>
-              <View style={[styles.iconWrap, { backgroundColor: `${color}10`, borderColor: `${color}25` }]}>
-                <Ionicons
-                  name={icon as IconName}
-                  size={16}
-                  color={color as string}
-                />
-              </View>
+            ["Total Users", formatNumber(totalUsers), "people-outline"],
+            ["Drug Records", formatNumber(drugs), "medical-outline"],
+            ["Subscriptions", formatNumber(subscriptions), "card-outline"],
+          ].map(([label, value, icon], index) => (
+            <View key={label} style={[styles.statusRow, index === 3 && { borderBottomWidth: 0 }]}>
+              <Ionicons
+                name={icon as IconName}
+                size={16}
+                color={SLATE_MID}
+                style={styles.statusIcon}
+              />
               <Text style={styles.statusLabel}>{label}</Text>
-              <View style={styles.statusBadge}>
-                <Text style={[styles.statusValue, { color: color as string }]}>{value}</Text>
-              </View>
+              <Text style={styles.statusValue}>{value}</Text>
             </View>
           ))}
         </View>
@@ -105,22 +99,22 @@ export default function FacilitiesOverview({
 const styles = StyleSheet.create({
   panel: {
     backgroundColor: "#fff",
-    borderRadius: 16,
-    padding: 24,
+    borderRadius: 12,
+    padding: 20,
     borderWidth: 1,
     borderColor: BORDER,
     flexGrow: 1,
     flexBasis: 320,
-    shadowColor: "#3B82F6",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.05,
-    shadowRadius: 16,
-    elevation: 3,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 1,
   },
   facilitiesPanel: { flexBasis: 360 },
   statusPanel: { flexBasis: 300 },
-  panelTitle: { color: TEXT_DARK, fontSize: 16, fontWeight: "800" },
-  panelSub: { color: TEXT_MUTED, fontSize: 11, fontWeight: "500", marginTop: 2, marginBottom: 12 },
+  panelTitle: { color: SLATE_DARK, fontSize: 16, fontWeight: "700" },
+  panelSub: { color: SLATE_LIGHT, fontSize: 11, fontWeight: "500", marginTop: 2, marginBottom: 12 },
   donutWrap: {
     flexDirection: "row",
     alignItems: "center",
@@ -133,67 +127,47 @@ const styles = StyleSheet.create({
     borderRadius: 72,
     backgroundColor: "#FAFBFD",
     borderWidth: 1,
-    borderColor: "#F1F5F9",
+    borderColor: BORDER,
   },
   donut: {
     width: 120,
     height: 120,
     borderRadius: 60,
-    borderWidth: 14,
-    borderColor: BLUE,
-    borderLeftColor: PURPLE,
-    borderTopColor: PURPLE,
+    borderWidth: 12,
+    borderColor: SLATE_DARK,
+    borderLeftColor: SLATE_LIGHT,
+    borderTopColor: SLATE_LIGHT,
     borderBottomColor: "#E2E8F0",
     alignItems: "center",
     justifyContent: "center",
   },
-  donutValue: { color: TEXT_DARK, fontSize: 24, fontWeight: "900", letterSpacing: -0.5 },
-  donutLabel: { color: TEXT_MUTED, fontSize: 10, fontWeight: "700", textTransform: "uppercase", marginTop: 1 },
+  donutValue: { color: SLATE_DARK, fontSize: 24, fontWeight: "700", letterSpacing: -0.5 },
+  donutLabel: { color: SLATE_LIGHT, fontSize: 10, fontWeight: "600", textTransform: "uppercase", marginTop: 1 },
   legend: { gap: 14 },
   legendItem: { flexDirection: "row", alignItems: "center", gap: 10 },
   dot: { width: 8, height: 8, borderRadius: 4 },
-  legendLabel: { color: TEXT_MUTED, fontSize: 11, fontWeight: "600" },
-  legendValue: { color: TEXT_DARK, fontSize: 15, fontWeight: "900", marginTop: 1 },
+  legendLabel: { color: SLATE_MID, fontSize: 11, fontWeight: "500" },
+  legendValue: { color: SLATE_DARK, fontSize: 15, fontWeight: "700", marginTop: 1 },
   viewButton: {
-    height: 42,
-    borderRadius: 12,
-    backgroundColor: "#EFF6FF",
     alignItems: "center",
     justifyContent: "center",
     flexDirection: "row",
-    gap: 6,
-    borderWidth: 1,
-    borderColor: "rgba(59, 130, 246, 0.15)",
+    gap: 4,
     marginTop: 14,
+    paddingVertical: 8,
   },
-  viewButtonText: { color: BLUE, fontSize: 12, fontWeight: "800" },
-  statusList: { gap: 8 },
+  viewButtonText: { color: "#3B82F6", fontSize: 13, fontWeight: "600" },
+  statusList: {},
   statusRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    backgroundColor: "#FAFBFD",
-    padding: 10,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#F1F5F9",
+    borderBottomWidth: 1,
+    borderBottomColor: "#F1F5F9",
+    paddingVertical: 12,
   },
-  iconWrap: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
+  statusIcon: {
+    marginRight: 10,
   },
-  statusLabel: { color: "#334155", fontSize: 12, fontWeight: "700", flex: 1 },
-  statusBadge: {
-    backgroundColor: "#fff",
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-  },
-  statusValue: { fontSize: 12, fontWeight: "800" },
+  statusLabel: { color: SLATE_DARK, fontSize: 13, fontWeight: "500", flex: 1 },
+  statusValue: { color: SLATE_MID, fontSize: 13, fontWeight: "600" },
 });

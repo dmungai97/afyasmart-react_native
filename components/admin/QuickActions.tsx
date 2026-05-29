@@ -2,15 +2,10 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
-const BLUE = "#3B82F6";
-const GREEN = "#10B981";
-const RED = "#EF4444";
-const ORANGE = "#F59E0B";
-const PURPLE = "#8B5CF6";
-const CYAN = "#06B6D4";
-const BORDER = "#F1F5F9";
-const TEXT_DARK = "#0F172A";
-const TEXT_MUTED = "#64748B";
+const SLATE_DARK = "#1E293B";
+const SLATE_MID = "#475569";
+const SLATE_LIGHT = "#94A3B8";
+const BORDER = "#E2E8F0";
 
 const STRINGS = {
   quickActions: "Quick Actions",
@@ -34,13 +29,13 @@ type IconName = keyof typeof Ionicons.glyphMap;
 export default function QuickActions() {
   const router = useRouter();
 
-  const actionsList: [IconName, string, string, string, string][] = [
-    ["add-circle", STRINGS.addFacility, STRINGS.addFacilitySub, BLUE, "/admin/facilities"],
-    ["business-outline", STRINGS.approveFacilities, STRINGS.approveFacilitiesSub, GREEN, "/admin/facilities"],
-    ["trash", STRINGS.removeFacility, STRINGS.removeFacilitySub, RED, "/admin/facilities"],
-    ["card-outline", STRINGS.viewPayouts, STRINGS.viewPayoutsSub, ORANGE, "/admin/transactions"],
-    ["people-outline", STRINGS.viewUsers, STRINGS.viewUsersSub, PURPLE, "/admin/users"],
-    ["receipt-outline", STRINGS.viewTransactions, STRINGS.viewTransactionsSub, CYAN, "/admin/transactions"],
+  const actionsList: [IconName, string, string, string][] = [
+    ["add-circle-outline", STRINGS.addFacility, STRINGS.addFacilitySub, "/admin/facilities"],
+    ["business-outline", STRINGS.approveFacilities, STRINGS.approveFacilitiesSub, "/admin/facilities"],
+    ["trash-outline", STRINGS.removeFacility, STRINGS.removeFacilitySub, "/admin/facilities"],
+    ["card-outline", STRINGS.viewPayouts, STRINGS.viewPayoutsSub, "/admin/transactions"],
+    ["people-outline", STRINGS.viewUsers, STRINGS.viewUsersSub, "/admin/users"],
+    ["receipt-outline", STRINGS.viewTransactions, STRINGS.viewTransactionsSub, "/admin/transactions"],
   ];
 
   return (
@@ -52,21 +47,21 @@ export default function QuickActions() {
         </View>
       </View>
       <View style={styles.grid}>
-        {actionsList.map(([icon, title, sub, color, route]) => (
+        {actionsList.map(([icon, title, sub, route]) => (
           <TouchableOpacity
             key={title}
-            style={[styles.actionCard, { borderLeftColor: color }]}
+            style={styles.actionCard}
             onPress={() => router.push(route as any)}
             activeOpacity={0.7}
           >
-            <View style={[styles.actionIcon, { backgroundColor: `${color}12`, borderColor: `${color}30` }]}>
-              <Ionicons name={icon} size={18} color={color} />
+            <View style={styles.actionIcon}>
+              <Ionicons name={icon} size={18} color={SLATE_MID} />
             </View>
             <View style={styles.textContainer}>
               <Text style={styles.actionTitle}>{title}</Text>
               <Text style={styles.actionSub}>{sub}</Text>
             </View>
-            <Ionicons name="chevron-forward" size={14} color={color} />
+            <Ionicons name="chevron-forward" size={14} color={SLATE_LIGHT} />
           </TouchableOpacity>
         ))}
       </View>
@@ -77,16 +72,16 @@ export default function QuickActions() {
 const styles = StyleSheet.create({
   quickActions: {
     backgroundColor: "#fff",
-    borderRadius: 16,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: BORDER,
-    padding: 24,
+    padding: 20,
     gap: 16,
-    shadowColor: "#3B82F6",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.05,
-    shadowRadius: 16,
-    elevation: 3,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 1,
     width: "100%",
   },
   quickHeader: {
@@ -95,8 +90,8 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginBottom: 4,
   },
-  panelTitle: { color: TEXT_DARK, fontSize: 16, fontWeight: "800" },
-  panelSub: { color: TEXT_MUTED, fontSize: 11, fontWeight: "500", marginTop: 2 },
+  panelTitle: { color: SLATE_DARK, fontSize: 16, fontWeight: "700" },
+  panelSub: { color: SLATE_LIGHT, fontSize: 11, fontWeight: "500", marginTop: 2 },
   grid: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -106,26 +101,25 @@ const styles = StyleSheet.create({
   actionCard: {
     flexGrow: 1,
     flexBasis: 240,
-    minHeight: 68,
-    borderRadius: 12,
+    minHeight: 64,
+    borderRadius: 10,
     backgroundColor: "#FAFBFD",
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    padding: 14,
+    padding: 12,
     borderWidth: 1,
     borderColor: "#F1F5F9",
-    borderLeftWidth: 4,
   },
   actionIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: 10,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#F1F5F9",
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 1,
   },
   textContainer: { flex: 1 },
-  actionTitle: { color: TEXT_DARK, fontSize: 13, fontWeight: "800" },
-  actionSub: { color: TEXT_MUTED, fontSize: 11, marginTop: 3, fontWeight: "500" },
+  actionTitle: { color: SLATE_DARK, fontSize: 13, fontWeight: "600" },
+  actionSub: { color: SLATE_LIGHT, fontSize: 11, marginTop: 2, fontWeight: "500" },
 });

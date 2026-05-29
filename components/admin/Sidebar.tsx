@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { usePathname, useRouter } from "expo-router";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
-const DARK_BG = "#0B0F19";
+const DARK_BG = "#1E293B";
 const BRAND_GREEN = "#10B981";
 const ACCENT_BLUE = "#3B82F6";
 
@@ -20,21 +20,15 @@ const STRINGS = {
   brandSub: "Admin Console",
   dashboard: "Dashboard",
   facilityMgmt: "Facility Management",
-  facilityApprovals: "Facility Approvals",
   allFacilities: "All Facilities",
   addFacility: "Add Facility",
-  removeFacility: "Remove Facility",
   financialMgmt: "Financial Management",
   revenueIncome: "Revenue & Income",
-  payouts: "Payouts",
-  commissions: "Commissions",
   transactions: "Transactions",
   userMgmt: "User Management",
   allUsers: "All Users",
-  system: "System",
-  notifications: "Notifications",
-  settings: "System Settings",
   superAdmin: "Super Administrator",
+  logout: "Logout",
 };
 
 type NavItem = {
@@ -53,7 +47,7 @@ const NAV: NavSection[] = [
   {
     header: "",
     items: [
-      { icon: "grid", label: STRINGS.dashboard, route: "/admin" },
+      { icon: "grid-outline", label: STRINGS.dashboard, route: "/admin" },
     ],
   },
   {
@@ -97,7 +91,7 @@ function SidebarItem({
       onPress={onPress ?? (() => {})}
       activeOpacity={0.7}
     >
-      <Ionicons name={icon} size={18} color={active ? "#fff" : "#94A3B8"} />
+      <Ionicons name={icon} size={18} color="#fff" style={styles.iconStyle} />
       <Text style={[styles.sideLabel, active && styles.sideLabelActive]}>{label}</Text>
       {badge ? <Text style={styles.badge}>{badge}</Text> : null}
     </TouchableOpacity>
@@ -125,22 +119,23 @@ export default function Sidebar({ userName, onSignOut, isMobile, onClose }: Side
 
   return (
     <View style={[styles.sidebar, isMobile && styles.sidebarMobile]}>
-      {/* Brand row */}
-      <View style={styles.brandRow}>
-        <View style={styles.brandLeft}>
-          <View style={styles.logo}>
-            <Ionicons name="heart" size={20} color="#fff" />
-          </View>
-          <View>
-            <Text style={styles.brand}>{STRINGS.brand}</Text>
-            <Text style={styles.brandSub}>{STRINGS.brandSub}</Text>
-          </View>
-        </View>
-        {isMobile && onClose && (
+      {/* Mobile Close Button Row */}
+      {isMobile && onClose && (
+        <View style={styles.mobileHeader}>
           <TouchableOpacity style={styles.closeBtn} onPress={onClose} activeOpacity={0.7}>
-            <Ionicons name="close-outline" size={24} color="#94A3B8" />
+            <Ionicons name="arrow-back-outline" size={22} color="#fff" />
+            <Text style={styles.closeText}>Back</Text>
           </TouchableOpacity>
-        )}
+        </View>
+      )}
+
+      {/* Centered Profile Section (iOS style) */}
+      <View style={styles.profileSection}>
+        <View style={styles.avatar}>
+          <Text style={styles.avatarText}>{(userName?.[0] ?? "A").toUpperCase()}</Text>
+        </View>
+        <Text style={styles.profileName}>{userName ?? "Admin"}</Text>
+        <Text style={styles.profileRole}>{STRINGS.superAdmin}</Text>
       </View>
 
       {/* Nav Sections */}
@@ -164,16 +159,10 @@ export default function Sidebar({ userName, onSignOut, isMobile, onClose }: Side
         ))}
       </View>
 
-      {/* Profile / Sign out */}
-      <TouchableOpacity style={styles.adminProfile} onPress={onSignOut} activeOpacity={0.7}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>{(userName?.[0] ?? "A").toUpperCase()}</Text>
-        </View>
-        <View style={styles.profileText}>
-          <Text style={styles.profileName}>{userName ?? "Admin"}</Text>
-          <Text style={styles.profileRole}>{STRINGS.superAdmin}</Text>
-        </View>
-        <Ionicons name="log-out-outline" size={16} color="#94A3B8" />
+      {/* Logout button at the bottom */}
+      <TouchableOpacity style={styles.logoutButton} onPress={onSignOut} activeOpacity={0.7}>
+        <Ionicons name="log-out-outline" size={18} color="#fff" style={styles.iconStyle} />
+        <Text style={styles.logoutText}>{STRINGS.logout}</Text>
       </TouchableOpacity>
     </View>
   );
@@ -184,7 +173,6 @@ const styles = StyleSheet.create({
     width: 264,
     backgroundColor: DARK_BG,
     padding: 20,
-    gap: 6,
     height: "100%",
     borderRightWidth: 1,
     borderRightColor: "rgba(255,255,255,0.05)",
@@ -197,58 +185,63 @@ const styles = StyleSheet.create({
     bottom: 0,
     zIndex: 999,
   },
-  brandRow: {
+  mobileHeader: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    marginBottom: 10,
+  },
+  closeBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingVertical: 4,
+  },
+  closeText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  profileSection: {
+    alignItems: "center",
+    marginTop: 20,
     marginBottom: 28,
   },
-  brandLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
-  logo: {
-    width: 38,
-    height: 38,
-    borderRadius: 10,
-    backgroundColor: BRAND_GREEN,
+  avatar: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    backgroundColor: "rgba(255,255,255,0.08)",
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: BRAND_GREEN,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.15)",
   },
-  brand: { color: "#fff", fontSize: 20, fontWeight: "900", letterSpacing: 0.5 },
-  brandSub: { color: "#64748B", fontSize: 11, marginTop: 1, fontWeight: "600" },
-  closeBtn: { padding: 4 },
+  avatarText: { color: "#fff", fontWeight: "700", fontSize: 24 },
+  profileName: { color: "#fff", fontWeight: "600", fontSize: 16, marginTop: 12 },
+  profileRole: { color: "#94A3B8", fontSize: 11, marginTop: 2, fontWeight: "500" },
   navGroup: { flex: 1 },
   navHeader: {
-    color: "#475569",
+    color: "#64748B",
     fontSize: 9,
-    fontWeight: "800",
-    marginTop: 22,
-    marginBottom: 8,
+    fontWeight: "700",
+    marginTop: 18,
+    marginBottom: 6,
     textTransform: "uppercase",
-    letterSpacing: 1.2,
+    letterSpacing: 1.0,
   },
   sideItem: {
     height: 40,
     borderRadius: 8,
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
     paddingHorizontal: 12,
     marginBottom: 2,
   },
   sideItemActive: {
-    backgroundColor: ACCENT_BLUE,
-    shadowColor: ACCENT_BLUE,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 3,
+    backgroundColor: "rgba(255, 255, 255, 0.08)",
   },
-  sideLabel: { color: "#94A3B8", fontSize: 13, fontWeight: "600", flex: 1 },
-  sideLabelActive: { color: "#fff", fontWeight: "700" },
+  sideLabel: { color: "#E2E8F0", fontSize: 13, fontWeight: "500", flex: 1 },
+  sideLabelActive: { color: "#fff", fontWeight: "600" },
   badge: {
     color: "#fff",
     backgroundColor: BRAND_GREEN,
@@ -259,26 +252,20 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontWeight: "900",
   },
-  adminProfile: {
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.06)",
-    borderRadius: 12,
-    padding: 12,
+  iconStyle: {
+    marginRight: 10,
+  },
+  logoutButton: {
+    height: 40,
+    borderRadius: 8,
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
-    backgroundColor: "rgba(255,255,255,0.02)",
+    paddingHorizontal: 12,
+    marginTop: 20,
   },
-  avatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: "rgba(255,255,255,0.08)",
-    alignItems: "center",
-    justifyContent: "center",
+  logoutText: {
+    color: "#fff",
+    fontSize: 13,
+    fontWeight: "500",
   },
-  avatarText: { color: "#fff", fontWeight: "800", fontSize: 15 },
-  profileText: { flex: 1 },
-  profileName: { color: "#fff", fontWeight: "700", fontSize: 13 },
-  profileRole: { color: "#64748B", fontSize: 10, marginTop: 1, fontWeight: "500" },
 });

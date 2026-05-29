@@ -2,12 +2,10 @@ import { Ionicons } from "@expo/vector-icons";
 import { StyleSheet, Text, View } from "react-native";
 import { AdminRecentUser, AdminTransaction } from "../../src/services/admin.service";
 
-const BLUE = "#3B82F6";
-const GREEN = "#10B981";
-const PURPLE = "#8B5CF6";
-const BORDER = "#F1F5F9";
-const TEXT_DARK = "#0F172A";
-const TEXT_MUTED = "#64748B";
+const SLATE_DARK = "#1E293B";
+const SLATE_MID = "#475569";
+const SLATE_LIGHT = "#94A3B8";
+const BORDER = "#E2E8F0";
 
 interface RecentTablesProps {
   recentUsers: AdminRecentUser[];
@@ -24,20 +22,6 @@ const formatNumber = (value: number) =>
   new Intl.NumberFormat("en-KE").format(value);
 
 const formatMoney = (value: number) => `Ksh ${formatNumber(value)}`;
-
-const getAvatarColor = (name: string) => {
-  const colors = [
-    { bg: "#EFF6FF", text: "#3B82F6" }, // Blue
-    { bg: "#ECFDF5", text: "#10B981" }, // Green
-    { bg: "#F5F3FF", text: "#8B5CF6" }, // Purple
-    { bg: "#FFFBEB", text: "#F59E0B" }, // Orange
-    { bg: "#FEF2F2", text: "#EF4444" }, // Red
-    { bg: "#ECFEFF", text: "#06B6D4" }, // Cyan
-  ];
-  const charSum = name.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
-  const index = Math.abs(charSum) % colors.length;
-  return colors[index];
-};
 
 export default function RecentTables({
   recentUsers,
@@ -62,11 +46,10 @@ export default function RecentTables({
         </View>
         <View style={styles.rowsContainer}>
           {(recentUsers.length > 0 ? recentUsers : []).map((item, index) => {
-            const colors = getAvatarColor(item.name);
             return (
-              <View key={item.id} style={[styles.row, index % 2 === 1 && styles.rowAlt]}>
-                <View style={[styles.rowAvatar, { backgroundColor: colors.bg }]}>
-                  <Text style={[styles.avatarText, { color: colors.text }]}>
+              <View key={item.id} style={[styles.row, index === (recentUsers.length - 1) && { borderBottomWidth: 0 }]}>
+                <View style={styles.rowAvatar}>
+                  <Text style={styles.avatarText}>
                     {(item.name[0] ?? "U").toUpperCase()}
                   </Text>
                 </View>
@@ -101,9 +84,9 @@ export default function RecentTables({
         </View>
         <View style={styles.rowsContainer}>
           {transactions.map((item, index) => (
-            <View key={item.id} style={[styles.row, index % 2 === 1 && styles.rowAlt]}>
-              <View style={[styles.rowIconWrap, { backgroundColor: "rgba(16,185,129,0.08)", borderColor: "rgba(16,185,129,0.2)" }]}>
-                <Ionicons name="receipt" size={16} color={GREEN} />
+            <View key={item.id} style={[styles.row, index === (transactions.length - 1) && { borderBottomWidth: 0 }]}>
+              <View style={styles.rowIconWrap}>
+                <Ionicons name="receipt-outline" size={16} color={SLATE_MID} />
               </View>
               <View style={styles.rowMain}>
                 <Text style={styles.rowTitle}>{item.name}</Text>
@@ -123,7 +106,7 @@ export default function RecentTables({
         ) : null}
       </View>
 
-      {/* Top Performing Facilities Table */}
+      {/* Platform Summary Table */}
       <View style={styles.panel}>
         <View style={styles.panelHeader}>
           <View>
@@ -140,23 +123,16 @@ export default function RecentTables({
             ["Active Users", formatNumber(activeUsers), "Subscribers"],
             ["Total Users", formatNumber(totalUsers), "Accounts"],
           ].map(([name, count, label], index) => {
-            const isGold = index === 0;
-            const isSilver = index === 1;
-            const isBronze = index === 2;
-            const badgeBg = isGold ? "#FEF3C7" : isSilver ? "#E2E8F0" : isBronze ? "#FFEDD5" : "#F1F5F9";
-            const badgeTextColor = isGold ? "#D97706" : isSilver ? "#475569" : isBronze ? "#D97706" : "#475569";
             return (
-              <View key={name} style={[styles.rankRow, index % 2 === 1 && styles.rowAlt]}>
-                <View style={[styles.rankBadge, { backgroundColor: badgeBg }]}>
-                  <Text style={[styles.rankText, { color: badgeTextColor }]}>{index + 1}</Text>
+              <View key={name} style={[styles.rankRow, index === 4 && { borderBottomWidth: 0 }]}>
+                <View style={styles.rankBadge}>
+                  <Text style={styles.rankText}>{index + 1}</Text>
                 </View>
                 <View style={styles.rankNameCol}>
                   <Text style={styles.rankName}>{name}</Text>
                   <Text style={styles.rowSub}>{label}</Text>
                 </View>
-                <View style={styles.rankCountBadge}>
-                  <Text style={styles.amount}>{count}</Text>
-                </View>
+                <Text style={styles.amount}>{count}</Text>
               </View>
             );
           })}
@@ -175,17 +151,17 @@ const styles = StyleSheet.create({
   },
   panel: {
     backgroundColor: "#fff",
-    borderRadius: 16,
-    padding: 24,
+    borderRadius: 12,
+    padding: 20,
     borderWidth: 1,
     borderColor: BORDER,
     flexGrow: 1,
     flexBasis: 292,
-    shadowColor: "#3B82F6",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.05,
-    shadowRadius: 16,
-    elevation: 3,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 1,
   },
   panelHeader: {
     flexDirection: "row",
@@ -193,71 +169,64 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     marginBottom: 16,
   },
-  panelTitle: { color: TEXT_DARK, fontSize: 16, fontWeight: "800" },
-  panelSub: { color: TEXT_MUTED, fontSize: 11, fontWeight: "500", marginTop: 2 },
-  linkText: { color: BLUE, fontSize: 12, fontWeight: "700" },
-  rowsContainer: {
-    gap: 2,
-  },
+  panelTitle: { color: SLATE_DARK, fontSize: 16, fontWeight: "700" },
+  panelSub: { color: SLATE_LIGHT, fontSize: 11, fontWeight: "500", marginTop: 2 },
+  linkText: { color: "#3B82F6", fontSize: 12, fontWeight: "600" },
+  rowsContainer: {},
   row: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    padding: 10,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "transparent",
-  },
-  rowAlt: {
-    backgroundColor: "#FAFBFD",
-    borderColor: "#F1F5F9",
+    borderBottomWidth: 1,
+    borderBottomColor: "#F1F5F9",
+    paddingVertical: 10,
   },
   rowAvatar: {
     width: 36,
     height: 36,
     borderRadius: 18,
+    backgroundColor: "#F1F5F9",
     alignItems: "center",
     justifyContent: "center",
   },
   avatarText: {
-    fontWeight: "800",
+    fontWeight: "700",
     fontSize: 14,
+    color: SLATE_DARK,
   },
   rowIconWrap: {
     width: 36,
     height: 36,
-    borderRadius: 10,
+    borderRadius: 18,
+    backgroundColor: "#F1F5F9",
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 1,
   },
   rowMain: { flex: 1, minWidth: 100 },
-  rowTitle: { color: TEXT_DARK, fontSize: 13, fontWeight: "700" },
-  rowSub: { color: TEXT_MUTED, fontSize: 11, marginTop: 2, fontWeight: "500" },
+  rowTitle: { color: SLATE_DARK, fontSize: 13, fontWeight: "600" },
+  rowSub: { color: SLATE_LIGHT, fontSize: 11, marginTop: 2, fontWeight: "500" },
   badgeActive: {
     borderRadius: 20,
-    backgroundColor: "#ECFDF5",
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderWidth: 1,
-    borderColor: "#A7F3D0",
+    backgroundColor: "#F1F5F9",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
   },
-  badgeTextActive: { color: GREEN, fontSize: 10, fontWeight: "800" },
+  badgeTextActive: { color: SLATE_DARK, fontSize: 10, fontWeight: "600" },
   badgeFree: {
     borderRadius: 20,
     backgroundColor: "#F8FAFC",
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: BORDER,
   },
-  badgeTextFree: { color: TEXT_MUTED, fontSize: 10, fontWeight: "800" },
+  badgeTextFree: { color: SLATE_LIGHT, fontSize: 10, fontWeight: "600" },
   amountCol: { alignItems: "flex-end" },
-  amount: { color: TEXT_DARK, fontSize: 13, fontWeight: "800" },
+  amount: { color: SLATE_DARK, fontSize: 13, fontWeight: "700" },
   emptyText: {
-    color: TEXT_MUTED,
+    color: SLATE_LIGHT,
     fontSize: 12,
-    fontWeight: "700",
+    fontWeight: "600",
     paddingVertical: 16,
     textAlign: "center",
   },
@@ -265,30 +234,23 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    padding: 10,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "transparent",
+    borderBottomWidth: 1,
+    borderBottomColor: "#F1F5F9",
+    paddingVertical: 10,
   },
   rankBadge: {
-    width: 26,
-    height: 26,
-    borderRadius: 8,
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    backgroundColor: "#F1F5F9",
     alignItems: "center",
     justifyContent: "center",
   },
   rankText: {
-    fontWeight: "800",
-    fontSize: 12,
+    color: SLATE_MID,
+    fontWeight: "700",
+    fontSize: 11,
   },
   rankNameCol: { flex: 1 },
-  rankName: { color: TEXT_DARK, fontSize: 13, fontWeight: "700" },
-  rankCountBadge: {
-    backgroundColor: "#fff",
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
+  rankName: { color: SLATE_DARK, fontSize: 13, fontWeight: "600" },
 });

@@ -20,6 +20,7 @@ import { useAdminDashboard } from "../../hooks/useAdminDashboard";
 import { useAuthStore } from "../../src/store/authStore";
 
 const NAVY = "#111827";
+const SLATE_DARK = "#1E293B";
 const BLUE = "#3B82F6";
 const GREEN = "#10B981";
 const PURPLE = "#8B5CF6";
@@ -224,7 +225,7 @@ export default function AdminDashboard() {
         <View style={styles.summary}>
           <View style={styles.summaryIntro}>
             <View style={styles.summaryIcon}>
-              <Ionicons name="stats-chart" size={20} color="#fff" />
+              <Ionicons name="stats-chart" size={20} color={SLATE_DARK} />
             </View>
             <View>
               <Text style={styles.summaryTitle}>{STRINGS.platformSummary}</Text>
@@ -235,12 +236,12 @@ export default function AdminDashboard() {
           </View>
           <View style={styles.summaryMetricGrid}>
             {[
-              ["Total Users", formatNumber(dashboard?.metrics.totalUsers ?? 0), BLUE],
-              ["Active Users", formatNumber(dashboard?.metrics.activeUsers ?? 0), GREEN],
-              ["Subscriptions", formatNumber(dashboard?.metrics.subscriptions ?? 0), PURPLE],
-              ["Revenue", formatMoney(dashboard?.metrics.totalRevenue ?? 0), "#F59E0B"],
-            ].map(([label, value, color]) => (
-              <View key={label} style={[styles.summaryMetric, { borderLeftColor: color as string }]}>
+              ["Total Users", formatNumber(dashboard?.metrics.totalUsers ?? 0)],
+              ["Active Users", formatNumber(dashboard?.metrics.activeUsers ?? 0)],
+              ["Subscriptions", formatNumber(dashboard?.metrics.subscriptions ?? 0)],
+              ["Revenue", formatMoney(dashboard?.metrics.totalRevenue ?? 0)],
+            ].map(([label, value]) => (
+              <View key={label} style={styles.summaryMetric}>
                 <Text style={styles.summaryLabel}>{label}</Text>
                 <Text style={styles.summaryValue}>{value}</Text>
               </View>
@@ -253,7 +254,7 @@ export default function AdminDashboard() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, flexDirection: "row", backgroundColor: "#F4F6FA" },
+  root: { flex: 1, flexDirection: "row", backgroundColor: "#F8FAFC" },
   main: { flex: 1 },
   content: { padding: 24, gap: 24 },
   backdrop: {
@@ -281,9 +282,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderWidth: 1,
     borderColor: BORDER,
-    shadowColor: "#3B82F6",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.04,
     shadowRadius: 4,
   },
   menuBtn: {
@@ -298,80 +299,68 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
   },
-  title: { color: "#0B0F19", fontSize: 24, fontWeight: "900", letterSpacing: -0.5 },
+  title: { color: "#1E293B", fontSize: 24, fontWeight: "700", letterSpacing: -0.5 },
   liveContainer: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    backgroundColor: "rgba(16, 185, 129, 0.08)",
+    gap: 4,
+    backgroundColor: "#F1F5F9",
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: "rgba(16, 185, 129, 0.15)",
+    borderColor: BORDER,
   },
   liveDotOuter: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: "rgba(16, 185, 129, 0.25)",
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "rgba(22, 163, 74, 0.2)",
     alignItems: "center",
     justifyContent: "center",
   },
   liveDotInner: {
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
-    backgroundColor: GREEN,
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "#16A34A",
   },
-  liveText: { color: GREEN, fontSize: 10, fontWeight: "800", textTransform: "uppercase" },
-  subtitle: { color: MUTED, fontSize: 13, marginTop: 4, fontWeight: "500" },
+  liveText: { color: "#16A34A", fontSize: 9, fontWeight: "700", textTransform: "uppercase" },
+  subtitle: { color: "#64748B", fontSize: 13, marginTop: 4, fontWeight: "500" },
   topActions: { flexDirection: "row", alignItems: "center", gap: 10 },
   loadingPill: {
     height: 38,
     borderWidth: 1,
     borderColor: BORDER,
     backgroundColor: "#fff",
-    borderRadius: 12,
+    borderRadius: 10,
     paddingHorizontal: 12,
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    shadowColor: "#0F172A",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.02,
-    shadowRadius: 4,
   },
-  loadingText: { color: MUTED, fontSize: 11, fontWeight: "700" },
+  loadingText: { color: "#64748B", fontSize: 11, fontWeight: "600" },
   datePill: {
     height: 38,
     borderWidth: 1,
     borderColor: BORDER,
     backgroundColor: "#fff",
-    borderRadius: 12,
+    borderRadius: 10,
     paddingHorizontal: 12,
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    shadowColor: "#0F172A",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.02,
-    shadowRadius: 4,
   },
-  dateText: { color: "#0F172A", fontSize: 12, fontWeight: "700" },
+  dateText: { color: "#1E293B", fontSize: 12, fontWeight: "600" },
   bell: {
     width: 38,
     height: 38,
-    borderRadius: 12,
+    borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "#fff",
     borderWidth: 1,
     borderColor: BORDER,
-    shadowColor: "#0F172A",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.02,
-    shadowRadius: 4,
   },
   dot: {
     position: "absolute",
@@ -380,7 +369,7 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: RED,
+    backgroundColor: "#EF4444",
     borderWidth: 1.5,
     borderColor: "#fff",
   },
@@ -395,23 +384,23 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
   },
-  errorText: { color: "#991B1B", fontSize: 12, fontWeight: "700", flex: 1 },
+  errorText: { color: "#991B1B", fontSize: 12, fontWeight: "600", flex: 1 },
   overviewGrid: { flexDirection: "row", flexWrap: "wrap", gap: 16 },
   summary: {
-    backgroundColor: "#0B0F19",
-    borderRadius: 16,
-    padding: 24,
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    padding: 20,
     flexDirection: "row",
     flexWrap: "wrap",
     alignItems: "center",
     gap: 24,
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.05)",
+    borderColor: BORDER,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.1,
-    shadowRadius: 20,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 1,
   },
   summaryIntro: {
     flexDirection: "row",
@@ -423,15 +412,13 @@ const styles = StyleSheet.create({
   summaryIcon: {
     width: 44,
     height: 44,
-    borderRadius: 12,
-    backgroundColor: "rgba(255, 255, 255, 0.08)",
+    borderRadius: 22,
+    backgroundColor: "#F1F5F9",
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.15)",
   },
-  summaryTitle: { color: "#fff", fontSize: 16, fontWeight: "800" },
-  summarySub: { color: "#94A3B8", fontSize: 11, marginTop: 4, fontWeight: "500" },
+  summaryTitle: { color: "#1E293B", fontSize: 16, fontWeight: "700" },
+  summarySub: { color: "#64748B", fontSize: 11, marginTop: 4, fontWeight: "500" },
   summaryMetricGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -442,10 +429,11 @@ const styles = StyleSheet.create({
   summaryMetric: {
     flex: 1,
     minWidth: 110,
-    borderLeftWidth: 3,
-    paddingLeft: 12,
+    borderLeftWidth: 1,
+    borderLeftColor: BORDER,
+    paddingLeft: 16,
     paddingVertical: 4,
   },
-  summaryLabel: { color: "#64748B", fontSize: 11, fontWeight: "700" },
-  summaryValue: { color: "#fff", fontSize: 20, fontWeight: "900", marginTop: 4, letterSpacing: -0.5 },
+  summaryLabel: { color: "#64748B", fontSize: 11, fontWeight: "600" },
+  summaryValue: { color: "#1E293B", fontSize: 20, fontWeight: "700", marginTop: 4, letterSpacing: -0.5 },
 });

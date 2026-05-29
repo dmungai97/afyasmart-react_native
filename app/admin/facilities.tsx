@@ -26,9 +26,8 @@ import { useAuthStore } from "../../src/store/authStore";
 const BLUE = "#3B82F6";
 const GREEN = "#10B981";
 const RED = "#EF4444";
-const PURPLE = "#8B5CF6";
-const BORDER = "#F1F5F9";
-const NAVY = "#0F172A";
+const BORDER = "#E2E8F0";
+const NAVY = "#1E293B";
 const MUTED = "#64748B";
 
 const STRINGS = {
@@ -237,12 +236,12 @@ export default function AdminFacilitiesPage() {
           <View style={styles.titleRow}>
             {isMobile && (
               <TouchableOpacity style={styles.menuBtn} onPress={() => setMenuOpen(true)} activeOpacity={0.7}>
-                <Ionicons name="menu-outline" size={24} color="#0B0F19" />
+                <Ionicons name="menu-outline" size={24} color="#1E293B" />
               </TouchableOpacity>
             )}
             <View style={styles.backBtnWrap}>
               <TouchableOpacity style={styles.backBtn} onPress={() => router.push("/admin")} activeOpacity={0.7}>
-                <Ionicons name="arrow-back" size={18} color="#0B0F19" />
+                <Ionicons name="arrow-back" size={18} color="#1E293B" />
               </TouchableOpacity>
             </View>
             <View>
@@ -255,9 +254,9 @@ export default function AdminFacilitiesPage() {
               <Ionicons name="medkit-outline" size={15} color="#fff" />
               <Text style={styles.addBtnText}>+ Doctor</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.addBtn, { backgroundColor: PURPLE }]} onPress={() => openAdd("pharmacy")} activeOpacity={0.8}>
-              <Ionicons name="business-outline" size={15} color="#fff" />
-              <Text style={styles.addBtnText}>+ Pharmacy</Text>
+            <TouchableOpacity style={[styles.addBtn, styles.addBtnSecondary]} onPress={() => openAdd("pharmacy")} activeOpacity={0.8}>
+              <Ionicons name="business-outline" size={15} color="#475569" />
+              <Text style={[styles.addBtnText, { color: "#475569" }]}>+ Pharmacy</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -293,7 +292,7 @@ export default function AdminFacilitiesPage() {
 
         {/* Facility list */}
         {loading ? (
-          <ActivityIndicator size="large" color={BLUE} style={{ marginTop: 40 }} />
+          <ActivityIndicator size="large" color="#1E293B" style={{ marginTop: 40 }} />
         ) : filtered.length === 0 ? (
           <View style={styles.empty}>
             <Ionicons name="business-outline" size={48} color={MUTED} />
@@ -302,14 +301,14 @@ export default function AdminFacilitiesPage() {
         ) : (
           <View style={styles.grid}>
             {filtered.map((f) => (
-              <View key={f.id} style={[styles.card, { borderLeftColor: f.type === "doctor" ? BLUE : PURPLE }]}>
+              <View key={f.id} style={styles.card}>
                 <View style={styles.cardBody}>
                   <View style={styles.cardTop}>
-                    <View style={[styles.cardIcon, { backgroundColor: f.type === "doctor" ? "#EFF6FF" : "#F5F3FF", borderColor: f.type === "doctor" ? "rgba(59,130,246,0.2)" : "rgba(139,92,246,0.2)" }]}>
+                    <View style={styles.cardIcon}>
                       <Ionicons
                         name={f.type === "doctor" ? "medkit" : "business"}
                         size={20}
-                        color={f.type === "doctor" ? BLUE : PURPLE}
+                        color="#475569"
                       />
                     </View>
                     <View style={styles.cardInfo}>
@@ -320,8 +319,8 @@ export default function AdminFacilitiesPage() {
                       <Text style={styles.cardPhone}>{f.phone}</Text>
                     </View>
                     <View style={styles.cardBadge}>
-                      <View style={[styles.typeBadge, { backgroundColor: f.type === "doctor" ? "#EFF6FF" : "#F5F3FF", borderColor: f.type === "doctor" ? "rgba(59,130,246,0.15)" : "rgba(139,92,246,0.15)" }]}>
-                        <Text style={[styles.typeBadgeText, { color: f.type === "doctor" ? BLUE : PURPLE }]}>
+                      <View style={styles.typeBadge}>
+                        <Text style={styles.typeBadgeText}>
                           {f.type === "doctor" ? STRINGS.doctor : STRINGS.pharmacy}
                         </Text>
                       </View>
@@ -341,7 +340,7 @@ export default function AdminFacilitiesPage() {
                   </View>
                   <View style={styles.cardActions}>
                     <TouchableOpacity style={styles.editAction} onPress={() => openEdit(f)} activeOpacity={0.7}>
-                      <Ionicons name="create" size={14} color={BLUE} />
+                      <Ionicons name="create" size={14} color="#1E293B" />
                       <Text style={styles.editActionText}>Edit Details</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.deleteAction} onPress={() => handleDelete(f)} activeOpacity={0.7}>
@@ -508,7 +507,7 @@ export default function AdminFacilitiesPage() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, flexDirection: "row", backgroundColor: "#F4F6FA" },
+  root: { flex: 1, flexDirection: "row", backgroundColor: "#F8FAFC" },
   main: { flex: 1 },
   content: { padding: 24, gap: 16 },
   backdrop: { position: "absolute", left: 0, top: 0, right: 0, bottom: 0, backgroundColor: "rgba(11,15,25,0.4)", zIndex: 998 },
@@ -528,64 +527,65 @@ const styles = StyleSheet.create({
     padding: 6,
   },
   menuBtn: { padding: 6 },
-  title: { color: "#0B0F19", fontSize: 24, fontWeight: "900", letterSpacing: -0.5 },
+  title: { color: "#1E293B", fontSize: 24, fontWeight: "700", letterSpacing: -0.5 },
   subtitle: { color: MUTED, fontSize: 13, marginTop: 4, fontWeight: "500" },
   headerActions: { flexDirection: "row", gap: 8 },
-  addBtn: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: BLUE, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 12, shadowColor: BLUE, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8 },
-  addBtnText: { color: "#fff", fontSize: 12, fontWeight: "800" },
-  searchRow: { flexDirection: "row", alignItems: "center", backgroundColor: "#fff", borderRadius: 12, borderWidth: 1, borderColor: BORDER, height: 44, gap: 8, shadowColor: "#3B82F6", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.03, shadowRadius: 8 },
-  searchInput: { flex: 1, color: "#0B0F19", fontSize: 13, fontWeight: "500", paddingRight: 12 },
+  addBtn: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#1E293B", paddingHorizontal: 14, paddingVertical: 9, borderRadius: 12 },
+  addBtnSecondary: { backgroundColor: "#F1F5F9", borderWidth: 1, borderColor: "#E2E8F0" },
+  addBtnText: { color: "#fff", fontSize: 12, fontWeight: "700" },
+  searchRow: { flexDirection: "row", alignItems: "center", backgroundColor: "#fff", borderRadius: 10, borderWidth: 1, borderColor: BORDER, height: 44, gap: 8 },
+  searchInput: { flex: 1, color: "#1E293B", fontSize: 13, fontWeight: "500", paddingRight: 12 },
   filterRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, alignItems: "center" },
   filterChip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: "#fff", borderWidth: 1, borderColor: BORDER },
-  filterChipActive: { backgroundColor: BLUE, borderColor: BLUE },
-  filterChipText: { color: MUTED, fontSize: 12, fontWeight: "700" },
+  filterChipActive: { backgroundColor: "#1E293B", borderColor: "#1E293B" },
+  filterChipText: { color: MUTED, fontSize: 12, fontWeight: "600" },
   filterChipTextActive: { color: "#fff" },
   countText: { color: MUTED, fontSize: 11, fontWeight: "600", marginLeft: "auto" },
   empty: { alignItems: "center", paddingTop: 60, gap: 12 },
-  emptyText: { color: MUTED, fontSize: 15, fontWeight: "700" },
+  emptyText: { color: MUTED, fontSize: 15, fontWeight: "600" },
   grid: { gap: 14 },
-  card: { backgroundColor: "#fff", borderRadius: 16, borderWidth: 1, borderColor: BORDER, flexDirection: "row", overflow: "hidden", borderLeftWidth: 5, shadowColor: "#3B82F6", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.02, shadowRadius: 8 },
+  card: { backgroundColor: "#fff", borderRadius: 12, borderWidth: 1, borderColor: BORDER, flexDirection: "row", overflow: "hidden", shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 8, elevation: 1 },
   cardBody: { flex: 1, padding: 16 },
   cardTop: { flexDirection: "row", gap: 12, alignItems: "flex-start" },
-  cardIcon: { width: 44, height: 44, borderRadius: 12, alignItems: "center", justifyContent: "center", borderWidth: 1 },
+  cardIcon: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", backgroundColor: "#F1F5F9" },
   cardInfo: { flex: 1 },
   cardBadge: { alignItems: "flex-end", gap: 4 },
-  cardName: { color: "#0B0F19", fontSize: 15, fontWeight: "800" },
-  cardSpec: { color: BLUE, fontSize: 12, fontWeight: "700", marginTop: 2 },
+  cardName: { color: "#1E293B", fontSize: 15, fontWeight: "600" },
+  cardSpec: { color: "#475569", fontSize: 12, fontWeight: "600", marginTop: 2 },
   cardSub: { color: MUTED, fontSize: 11, fontWeight: "500", marginTop: 2 },
   cardPhone: { color: MUTED, fontSize: 11, fontWeight: "500", marginTop: 3 },
-  typeBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, borderWidth: 1 },
-  typeBadgeText: { fontSize: 10, fontWeight: "800" },
+  typeBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, borderWidth: 1, borderColor: "#E2E8F0", backgroundColor: "#F8FAFC" },
+  typeBadgeText: { fontSize: 10, fontWeight: "600", color: "#64748B" },
   availBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, borderWidth: 1 },
   availGreen: { backgroundColor: "#ECFDF5", borderColor: "#A7F3D0" },
   availRed: { backgroundColor: "#FEF2F2", borderColor: "#FECACA" },
-  availText: { fontSize: 10, fontWeight: "800" },
-  open24Badge: { backgroundColor: "#FFFBEB", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, borderWidth: 1, borderColor: "#FDE68A" },
-  open24Text: { color: "#D97706", fontSize: 10, fontWeight: "800" },
+  availText: { fontSize: 10, fontWeight: "600" },
+  open24Badge: { backgroundColor: "#FFFBEB", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, borderWidth: 1, borderColor: "#FEF3C7" },
+  open24Text: { color: "#B45309", fontSize: 10, fontWeight: "600" },
   cardActions: { flexDirection: "row", gap: 12, marginTop: 14, borderTopWidth: 1, borderTopColor: BORDER, paddingTop: 12 },
-  editAction: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#EFF6FF", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: "rgba(59,130,246,0.15)" },
-  editActionText: { color: BLUE, fontSize: 11, fontWeight: "800" },
-  deleteAction: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#FEF2F2", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: "rgba(239,68,68,0.15)" },
-  deleteActionText: { color: RED, fontSize: 11, fontWeight: "800" },
+  editAction: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#F1F5F9", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: "#E2E8F0" },
+  editActionText: { color: "#1E293B", fontSize: 11, fontWeight: "600" },
+  deleteAction: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#FEF2F2", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: "#FEE2E2" },
+  deleteActionText: { color: RED, fontSize: 11, fontWeight: "600" },
   // Modal
-  modalOverlay: { flex: 1, backgroundColor: "rgba(11, 15, 25, 0.5)" },
+  modalOverlay: { flex: 1, backgroundColor: "rgba(11, 15, 25, 0.5)", justifyContent: "flex-end" },
   modalScroll: { flexGrow: 1, justifyContent: "flex-end" },
   modalCard: { backgroundColor: "#fff", borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, gap: 14, shadowColor: "#000", shadowOffset: { width: 0, height: -6 }, shadowOpacity: 0.1, shadowRadius: 20, elevation: 8 },
   modalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", borderBottomWidth: 1, borderBottomColor: "#F1F5F9", paddingBottom: 14 },
-  modalTitle: { color: "#0B0F19", fontSize: 18, fontWeight: "900", letterSpacing: -0.5 },
+  modalTitle: { color: "#1E293B", fontSize: 18, fontWeight: "700", letterSpacing: -0.5 },
   modalSub: { color: MUTED, fontSize: 11, fontWeight: "500", marginTop: 2 },
   modalCloseBtn: { width: 32, height: 32, borderRadius: 8, backgroundColor: "#F8FAFC", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#E2E8F0" },
   fieldGroup: { gap: 6 },
-  fieldLabel: { color: MUTED, fontSize: 10, fontWeight: "800", textTransform: "uppercase", letterSpacing: 0.8 },
-  field: { height: 44, borderRadius: 10, borderWidth: 1, borderColor: "#E2E8F0", paddingHorizontal: 14, color: "#0B0F19", fontSize: 13, fontWeight: "600", backgroundColor: "#FAFBFD" },
+  fieldLabel: { color: MUTED, fontSize: 10, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.8 },
+  field: { height: 44, borderRadius: 10, borderWidth: 1, borderColor: "#E2E8F0", paddingHorizontal: 14, color: "#1E293B", fontSize: 13, fontWeight: "600", backgroundColor: "#FAFBFD" },
   roleRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   roleChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, backgroundColor: "#FAFBFD", borderWidth: 1, borderColor: "#E2E8F0" },
-  roleChipActive: { backgroundColor: BLUE, borderColor: BLUE },
-  roleChipText: { color: MUTED, fontSize: 12, fontWeight: "800", textTransform: "capitalize" },
+  roleChipActive: { backgroundColor: "#1E293B", borderColor: "#1E293B" },
+  roleChipText: { color: MUTED, fontSize: 12, fontWeight: "600", textTransform: "capitalize" },
   roleChipTextActive: { color: "#fff" },
   modalActions: { flexDirection: "row", gap: 12, marginTop: 12 },
   cancelBtn: { flex: 1, height: 46, borderRadius: 12, borderWidth: 1, borderColor: "#E2E8F0", alignItems: "center", justifyContent: "center" },
-  cancelText: { color: MUTED, fontWeight: "800", fontSize: 13 },
-  saveBtn: { flex: 2, height: 46, borderRadius: 12, backgroundColor: BLUE, alignItems: "center", justifyContent: "center" },
-  saveText: { color: "#fff", fontWeight: "800", fontSize: 13 },
+  cancelText: { color: MUTED, fontWeight: "600", fontSize: 13 },
+  saveBtn: { flex: 2, height: 46, borderRadius: 12, backgroundColor: "#3B82F6", alignItems: "center", justifyContent: "center" },
+  saveText: { color: "#fff", fontWeight: "600", fontSize: 13 },
 });

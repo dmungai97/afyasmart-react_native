@@ -1,10 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
 import { StyleSheet, Text, View } from "react-native";
 
-const BORDER = "#F1F5F9";
-const TEXT_DARK = "#0F172A";
+const BORDER = "#E2E8F0";
+const TEXT_DARK = "#1E293B";
 const TEXT_MUTED = "#64748B";
-const TREND_GREEN = "#10B981";
+const TREND_GREEN = "#16A34A";
 
 type IconName = keyof typeof Ionicons.glyphMap;
 
@@ -23,7 +23,7 @@ interface StatCardProps {
 
 export default function StatCard({ item }: StatCardProps) {
   return (
-    <View style={[styles.card, { borderLeftColor: item.color, shadowColor: item.color }]}>
+    <View style={styles.card}>
       <View style={styles.content}>
         <Text style={styles.label}>{item.label}</Text>
         <Text style={styles.value}>{item.value}</Text>
@@ -31,8 +31,8 @@ export default function StatCard({ item }: StatCardProps) {
           {item.change ? `+${item.change}` : item.sub}
         </Text>
       </View>
-      <View style={[styles.iconWrap, { backgroundColor: `${item.color}15`, borderColor: `${item.color}30` }]}>
-        <Ionicons name={item.icon} size={22} color={item.color} />
+      <View style={styles.iconWrap}>
+        <Ionicons name={item.icon} size={20} color="#475569" />
       </View>
     </View>
   );
@@ -43,18 +43,18 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     flexBasis: 180,
     backgroundColor: "#fff",
-    borderRadius: 16,
-    padding: 22,
+    borderRadius: 12,
+    padding: 18,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     borderWidth: 1,
     borderColor: BORDER,
-    borderLeftWidth: 5,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 1,
   },
   content: {
     flex: 1,
@@ -62,34 +62,33 @@ const styles = StyleSheet.create({
   },
   label: {
     color: TEXT_MUTED,
-    fontSize: 10,
-    fontWeight: "800",
-    letterSpacing: 0.8,
-    textTransform: "uppercase",
+    fontSize: 11,
+    fontWeight: "600",
+    letterSpacing: 0.3,
   },
   value: {
     color: TEXT_DARK,
-    fontSize: 28,
-    fontWeight: "900",
-    marginTop: 6,
-    letterSpacing: -0.8,
+    fontSize: 24,
+    fontWeight: "700",
+    marginTop: 4,
+    letterSpacing: -0.5,
   },
   subText: {
     color: TEXT_MUTED,
     fontSize: 11,
-    marginTop: 6,
-    fontWeight: "600",
+    marginTop: 4,
+    fontWeight: "500",
   },
   trend: {
     color: TREND_GREEN,
-    fontWeight: "700",
+    fontWeight: "600",
   },
   iconWrap: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: "#F1F5F9",
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 1,
   },
 });
