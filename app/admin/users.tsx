@@ -56,6 +56,20 @@ const STRINGS = {
   admin: "Admin",
 };
 
+const getAvatarColor = (name: string) => {
+  const colors = [
+    { bg: "#EFF6FF", text: "#3B82F6" }, // Blue
+    { bg: "#ECFDF5", text: "#10B981" }, // Green
+    { bg: "#F5F3FF", text: "#8B5CF6" }, // Purple
+    { bg: "#FFFBEB", text: "#F59E0B" }, // Orange
+    { bg: "#FEF2F2", text: "#EF4444" }, // Red
+    { bg: "#ECFEFF", text: "#06B6D4" }, // Cyan
+  ];
+  const charSum = name.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  const index = Math.abs(charSum) % colors.length;
+  return colors[index];
+};
+
 export default function AdminUsersPage() {
   const router = useRouter();
   const { width } = useWindowDimensions();
@@ -176,9 +190,14 @@ export default function AdminUsersPage() {
           <View style={styles.titleRow}>
             {isMobile && (
               <TouchableOpacity style={styles.menuBtn} onPress={() => setMenuOpen(true)} activeOpacity={0.7}>
-                <Ionicons name="menu-outline" size={24} color="#34315A" />
+                <Ionicons name="menu-outline" size={24} color="#0B0F19" />
               </TouchableOpacity>
             )}
+            <View style={styles.backBtnWrap}>
+              <TouchableOpacity style={styles.backBtn} onPress={() => router.push("/admin")} activeOpacity={0.7}>
+                <Ionicons name="arrow-back" size={18} color="#0B0F19" />
+              </TouchableOpacity>
+            </View>
             <View>
               <Text style={styles.title}>{STRINGS.title}</Text>
               <Text style={styles.subtitle}>{STRINGS.subtitle}</Text>
@@ -219,18 +238,18 @@ export default function AdminUsersPage() {
 
         {/* Stats bar */}
         <View style={styles.statsBar}>
-          <Text style={styles.statsText}>
-            <Text style={{ color: NAVY, fontWeight: "800" }}>{filtered.length}</Text>
-            {" "}of{" "}
-            <Text style={{ color: NAVY, fontWeight: "800" }}>{users.length}</Text>
-            {" "}users
-          </Text>
-          <Text style={styles.statsText}>
-            <Text style={{ color: GREEN, fontWeight: "800" }}>
+          <View style={styles.statsCardMini}>
+            <Text style={styles.statsLabelMini}>Filtered Users</Text>
+            <Text style={styles.statsValMini}>
+              {filtered.length} <Text style={{ color: MUTED, fontSize: 11, fontWeight: "500" }}>of {users.length}</Text>
+            </Text>
+          </View>
+          <View style={styles.statsCardMini}>
+            <Text style={styles.statsLabelMini}>Active Subscribers</Text>
+            <Text style={[styles.statsValMini, { color: GREEN }]}>
               {users.filter((u) => u.isSubscribed).length}
             </Text>
-            {" "}active subscribers
-          </Text>
+          </View>
         </View>
 
         {/* Users list */}
@@ -243,44 +262,47 @@ export default function AdminUsersPage() {
           </View>
         ) : (
           <View style={styles.table}>
-            {filtered.map((u) => (
-              <View key={u.id} style={styles.row}>
-                {/* Avatar + Info */}
-                <View style={styles.rowAvatar}>
-                  <Text style={styles.avatarText}>{(u.name[0] ?? "U").toUpperCase()}</Text>
-                </View>
-                <View style={styles.rowInfo}>
-                  <Text style={styles.rowName}>{u.name}</Text>
-                  <Text style={styles.rowEmail}>{u.email}</Text>
-                  {u.phone ? <Text style={styles.rowPhone}>{u.phone}</Text> : null}
-                  <Text style={styles.rowDate}>{STRINGS.joined}: {u.createdAt}</Text>
-                </View>
-
-                {/* Badges */}
-                <View style={styles.rowBadges}>
-                  <View style={[styles.badge, u.isSubscribed ? styles.badgeGreen : styles.badgeGray]}>
-                    <Text style={[styles.badgeText, u.isSubscribed ? styles.badgeTextGreen : styles.badgeTextGray]}>
-                      {u.isSubscribed ? STRINGS.active : STRINGS.free2}
-                    </Text>
+            {filtered.map((u, index) => {
+              const avatarColors = getAvatarColor(u.name);
+              return (
+                <View key={u.id} style={[styles.row, index % 2 === 1 && styles.rowAlt]}>
+                  {/* Avatar + Info */}
+                  <View style={[styles.rowAvatar, { backgroundColor: avatarColors.bg }]}>
+                    <Text style={[styles.avatarText, { color: avatarColors.text }]}>{(u.name[0] ?? "U").toUpperCase()}</Text>
                   </View>
-                  {(u.role === "admin" || u.role === "super_admin") ? (
-                    <View style={[styles.badge, styles.badgeBlue]}>
-                      <Text style={[styles.badgeText, styles.badgeTextBlue]}>{STRINGS.admin}</Text>
-                    </View>
-                  ) : null}
-                  {u.subscriptionPlan !== "free" ? (
-                    <View style={[styles.badge, styles.badgeOrange]}>
-                      <Text style={[styles.badgeText, styles.badgeTextOrange]}>{u.subscriptionPlan}</Text>
-                    </View>
-                  ) : null}
-                </View>
+                  <View style={styles.rowInfo}>
+                    <Text style={styles.rowName}>{u.name}</Text>
+                    <Text style={styles.rowEmail}>{u.email}</Text>
+                    {u.phone ? <Text style={styles.rowPhone}>{u.phone}</Text> : null}
+                    <Text style={styles.rowDate}>{STRINGS.joined}: {u.createdAt}</Text>
+                  </View>
 
-                {/* Edit button */}
-                <TouchableOpacity style={styles.editBtn} onPress={() => openEdit(u)} activeOpacity={0.7}>
-                  <Ionicons name="create-outline" size={16} color={BLUE} />
-                </TouchableOpacity>
-              </View>
-            ))}
+                  {/* Badges */}
+                  <View style={styles.rowBadges}>
+                    <View style={[styles.badge, u.isSubscribed ? styles.badgeGreen : styles.badgeGray]}>
+                      <Text style={[styles.badgeText, u.isSubscribed ? styles.badgeTextGreen : styles.badgeTextGray]}>
+                        {u.isSubscribed ? STRINGS.active : STRINGS.free2}
+                      </Text>
+                    </View>
+                    {(u.role === "admin" || u.role === "super_admin") ? (
+                      <View style={[styles.badge, styles.badgeBlue]}>
+                        <Text style={[styles.badgeText, styles.badgeTextBlue]}>{STRINGS.admin}</Text>
+                      </View>
+                    ) : null}
+                    {u.subscriptionPlan !== "free" ? (
+                      <View style={[styles.badge, styles.badgeOrange]}>
+                        <Text style={[styles.badgeText, styles.badgeTextOrange]}>{u.subscriptionPlan}</Text>
+                      </View>
+                    ) : null}
+                  </View>
+
+                  {/* Edit button */}
+                  <TouchableOpacity style={styles.editBtn} onPress={() => openEdit(u)} activeOpacity={0.7}>
+                    <Ionicons name="create" size={16} color={BLUE} />
+                  </TouchableOpacity>
+                </View>
+              );
+            })}
           </View>
         )}
       </ScrollView>
@@ -290,9 +312,12 @@ export default function AdminUsersPage() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{STRINGS.editUser}</Text>
-              <TouchableOpacity onPress={() => setEditTarget(null)} activeOpacity={0.7}>
-                <Ionicons name="close-outline" size={24} color={MUTED} />
+              <View>
+                <Text style={styles.modalTitle}>{STRINGS.editUser}</Text>
+                <Text style={styles.modalSub}>Update credential & access controls</Text>
+              </View>
+              <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setEditTarget(null)} activeOpacity={0.7}>
+                <Ionicons name="close" size={20} color={MUTED} />
               </TouchableOpacity>
             </View>
 
@@ -373,66 +398,96 @@ export default function AdminUsersPage() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, flexDirection: "row", backgroundColor: "#F8FAFC" },
+  root: { flex: 1, flexDirection: "row", backgroundColor: "#F4F6FA" },
   main: { flex: 1 },
-  content: { padding: 24, gap: 16 },
+  content: { padding: 24, gap: 20 },
   backdrop: { position: "absolute", left: 0, top: 0, right: 0, bottom: 0, backgroundColor: "rgba(11,15,25,0.4)", zIndex: 998 },
   topbar: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   titleRow: { flexDirection: "row", alignItems: "center", gap: 12 },
+  backBtnWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: "#fff",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: BORDER,
+  },
+  backBtn: {
+    padding: 6,
+  },
   menuBtn: { padding: 6 },
-  title: { color: "#0F172A", fontSize: 22, fontWeight: "900", letterSpacing: -0.5 },
+  title: { color: "#0B0F19", fontSize: 24, fontWeight: "900", letterSpacing: -0.5 },
   subtitle: { color: MUTED, fontSize: 13, marginTop: 4, fontWeight: "500" },
-  refreshBtn: { width: 38, height: 38, borderRadius: 10, backgroundColor: "#fff", borderWidth: 1, borderColor: BORDER, alignItems: "center", justifyContent: "center" },
-  searchRow: { flexDirection: "row", alignItems: "center", backgroundColor: "#fff", borderRadius: 12, borderWidth: 1, borderColor: BORDER, height: 44, gap: 8 },
-  searchInput: { flex: 1, color: NAVY, fontSize: 13, fontWeight: "500", paddingRight: 12 },
+  refreshBtn: { width: 38, height: 38, borderRadius: 12, backgroundColor: "#fff", borderWidth: 1, borderColor: BORDER, alignItems: "center", justifyContent: "center", shadowColor: "#0F172A", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.02, shadowRadius: 4 },
+  searchRow: { flexDirection: "row", alignItems: "center", backgroundColor: "#fff", borderRadius: 12, borderWidth: 1, borderColor: BORDER, height: 44, gap: 8, shadowColor: "#3B82F6", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.03, shadowRadius: 8 },
+  searchInput: { flex: 1, color: "#0B0F19", fontSize: 13, fontWeight: "500", paddingRight: 12 },
   filterRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   filterChip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: "#fff", borderWidth: 1, borderColor: BORDER },
   filterChipActive: { backgroundColor: BLUE, borderColor: BLUE },
   filterChipText: { color: MUTED, fontSize: 12, fontWeight: "700" },
   filterChipTextActive: { color: "#fff" },
-  statsBar: { flexDirection: "row", justifyContent: "space-between", paddingHorizontal: 4 },
-  statsText: { color: MUTED, fontSize: 12, fontWeight: "600" },
+  statsBar: { flexDirection: "row", gap: 12 },
+  statsCardMini: {
+    flex: 1,
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: BORDER,
+    borderRadius: 14,
+    padding: 12,
+    shadowColor: "#3B82F6",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.03,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  statsLabelMini: { color: MUTED, fontSize: 10, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.4 },
+  statsValMini: { color: "#0B0F19", fontSize: 16, fontWeight: "900", marginTop: 4 },
   empty: { alignItems: "center", paddingTop: 60, gap: 12 },
   emptyText: { color: MUTED, fontSize: 15, fontWeight: "700" },
   table: { gap: 10 },
-  row: { backgroundColor: "#fff", borderRadius: 14, padding: 16, borderWidth: 1, borderColor: BORDER, flexDirection: "row", alignItems: "center", gap: 12 },
-  rowAvatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: "#EFF6FF", alignItems: "center", justifyContent: "center" },
-  avatarText: { color: BLUE, fontWeight: "800", fontSize: 17 },
+  row: { backgroundColor: "#fff", borderRadius: 16, padding: 16, borderWidth: 1, borderColor: BORDER, flexDirection: "row", alignItems: "center", gap: 12, shadowColor: "#3B82F6", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.02, shadowRadius: 8 },
+  rowAlt: { backgroundColor: "#FAFBFD" },
+  rowAvatar: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" },
+  avatarText: { fontWeight: "800", fontSize: 16 },
   rowInfo: { flex: 1, gap: 2 },
-  rowName: { color: NAVY, fontSize: 14, fontWeight: "800" },
+  rowName: { color: "#0B0F19", fontSize: 14, fontWeight: "800" },
   rowEmail: { color: MUTED, fontSize: 12, fontWeight: "500" },
   rowPhone: { color: MUTED, fontSize: 11, fontWeight: "500" },
   rowDate: { color: MUTED, fontSize: 10, fontWeight: "500", marginTop: 2 },
   rowBadges: { gap: 4, alignItems: "flex-end" },
-  badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
-  badgeText: { fontSize: 10, fontWeight: "700" },
-  badgeGreen: { backgroundColor: "#ECFDF5" },
+  badge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, borderWidth: 1 },
+  badgeText: { fontSize: 10, fontWeight: "800" },
+  badgeGreen: { backgroundColor: "#ECFDF5", borderColor: "#A7F3D0" },
   badgeTextGreen: { color: GREEN },
-  badgeGray: { backgroundColor: "#F8FAFC" },
+  badgeGray: { backgroundColor: "#F8FAFC", borderColor: "#E2E8F0" },
   badgeTextGray: { color: MUTED },
-  badgeBlue: { backgroundColor: "#EFF6FF" },
+  badgeBlue: { backgroundColor: "#EFF6FF", borderColor: "#BFDBFE" },
   badgeTextBlue: { color: BLUE },
-  badgeOrange: { backgroundColor: "#FFFBEB" },
+  badgeOrange: { backgroundColor: "#FFFBEB", borderColor: "#FDE68A" },
   badgeTextOrange: { color: ORANGE },
-  editBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: "#EFF6FF", alignItems: "center", justifyContent: "center" },
+  editBtn: { width: 38, height: 38, borderRadius: 10, backgroundColor: "#EFF6FF", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "rgba(59,130,246,0.15)" },
   // Modal
-  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
-  modalCard: { backgroundColor: "#fff", borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, gap: 16 },
-  modalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  modalTitle: { color: NAVY, fontSize: 18, fontWeight: "900" },
+  modalOverlay: { flex: 1, backgroundColor: "rgba(11, 15, 25, 0.5)", justifyContent: "flex-end" },
+  modalCard: { backgroundColor: "#fff", borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, gap: 16, shadowColor: "#000", shadowOffset: { width: 0, height: -6 }, shadowOpacity: 0.1, shadowRadius: 20, elevation: 8 },
+  modalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", borderBottomWidth: 1, borderBottomColor: "#F1F5F9", paddingBottom: 14 },
+  modalTitle: { color: "#0B0F19", fontSize: 18, fontWeight: "900", letterSpacing: -0.5 },
+  modalSub: { color: MUTED, fontSize: 11, fontWeight: "500", marginTop: 2 },
+  modalCloseBtn: { width: 32, height: 32, borderRadius: 8, backgroundColor: "#F8FAFC", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#E2E8F0" },
   fieldGroup: { gap: 6 },
-  fieldLabel: { color: MUTED, fontSize: 11, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5 },
-  field: { height: 44, borderRadius: 10, borderWidth: 1, borderColor: BORDER, paddingHorizontal: 14, color: NAVY, fontSize: 14, fontWeight: "600" },
+  fieldLabel: { color: MUTED, fontSize: 10, fontWeight: "800", textTransform: "uppercase", letterSpacing: 0.8 },
+  field: { height: 44, borderRadius: 10, borderWidth: 1, borderColor: "#E2E8F0", paddingHorizontal: 14, color: "#0B0F19", fontSize: 13, fontWeight: "600", backgroundColor: "#FAFBFD" },
   roleRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  roleChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, backgroundColor: "#F8FAFC", borderWidth: 1, borderColor: BORDER },
+  roleChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, backgroundColor: "#FAFBFD", borderWidth: 1, borderColor: "#E2E8F0" },
   roleChipActive: { backgroundColor: BLUE, borderColor: BLUE },
-  roleChipText: { color: MUTED, fontSize: 12, fontWeight: "700" },
+  roleChipText: { color: MUTED, fontSize: 12, fontWeight: "800", textTransform: "capitalize" },
   roleChipTextActive: { color: "#fff" },
   roleChipRed: { backgroundColor: "#FEF2F2", borderColor: "#FECACA" },
   roleChipTextRed: { color: RED },
-  modalActions: { flexDirection: "row", gap: 12, marginTop: 8 },
-  cancelBtn: { flex: 1, height: 46, borderRadius: 12, borderWidth: 1, borderColor: BORDER, alignItems: "center", justifyContent: "center" },
-  cancelText: { color: MUTED, fontWeight: "700" },
+  modalActions: { flexDirection: "row", gap: 12, marginTop: 12 },
+  cancelBtn: { flex: 1, height: 46, borderRadius: 12, borderWidth: 1, borderColor: "#E2E8F0", alignItems: "center", justifyContent: "center" },
+  cancelText: { color: MUTED, fontWeight: "800", fontSize: 13 },
   saveBtn: { flex: 2, height: 46, borderRadius: 12, backgroundColor: BLUE, alignItems: "center", justifyContent: "center" },
-  saveText: { color: "#fff", fontWeight: "800", fontSize: 14 },
+  saveText: { color: "#fff", fontWeight: "800", fontSize: 13 },
 });

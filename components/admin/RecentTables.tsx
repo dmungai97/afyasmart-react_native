@@ -25,6 +25,20 @@ const formatNumber = (value: number) =>
 
 const formatMoney = (value: number) => `Ksh ${formatNumber(value)}`;
 
+const getAvatarColor = (name: string) => {
+  const colors = [
+    { bg: "#EFF6FF", text: "#3B82F6" }, // Blue
+    { bg: "#ECFDF5", text: "#10B981" }, // Green
+    { bg: "#F5F3FF", text: "#8B5CF6" }, // Purple
+    { bg: "#FFFBEB", text: "#F59E0B" }, // Orange
+    { bg: "#FEF2F2", text: "#EF4444" }, // Red
+    { bg: "#ECFEFF", text: "#06B6D4" }, // Cyan
+  ];
+  const charSum = name.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  const index = Math.abs(charSum) % colors.length;
+  return colors[index];
+};
+
 export default function RecentTables({
   recentUsers,
   transactions,
@@ -40,28 +54,36 @@ export default function RecentTables({
       {/* Recent Users Table */}
       <View style={styles.panel}>
         <View style={styles.panelHeader}>
-          <Text style={styles.panelTitle}>Recent Users</Text>
+          <View>
+            <Text style={styles.panelTitle}>Recent Users</Text>
+            <Text style={styles.panelSub}>Latest signups on platform</Text>
+          </View>
           <Text style={styles.linkText}>{formatNumber(totalUsers)} total</Text>
         </View>
         <View style={styles.rowsContainer}>
-          {(recentUsers.length > 0 ? recentUsers : []).map((item) => (
-            <View key={item.id} style={styles.row}>
-              <View style={styles.rowIconWrap}>
-                <Ionicons name="person-outline" size={16} color={BLUE} />
+          {(recentUsers.length > 0 ? recentUsers : []).map((item, index) => {
+            const colors = getAvatarColor(item.name);
+            return (
+              <View key={item.id} style={[styles.row, index % 2 === 1 && styles.rowAlt]}>
+                <View style={[styles.rowAvatar, { backgroundColor: colors.bg }]}>
+                  <Text style={[styles.avatarText, { color: colors.text }]}>
+                    {(item.name[0] ?? "U").toUpperCase()}
+                  </Text>
+                </View>
+                <View style={styles.rowMain}>
+                  <Text style={styles.rowTitle}>{item.name}</Text>
+                  <Text style={styles.rowSub}>{item.email || "No email saved"}</Text>
+                </View>
+                <View style={item.subscribed ? styles.badgeActive : styles.badgeFree}>
+                  <Text
+                    style={item.subscribed ? styles.badgeTextActive : styles.badgeTextFree}
+                  >
+                    {item.subscribed ? "Active" : "Free"}
+                  </Text>
+                </View>
               </View>
-              <View style={styles.rowMain}>
-                <Text style={styles.rowTitle}>{item.name}</Text>
-                <Text style={styles.rowSub}>{item.email || "No email saved"}</Text>
-              </View>
-              <View style={item.subscribed ? styles.badgeActive : styles.badgeFree}>
-                <Text
-                  style={item.subscribed ? styles.badgeTextActive : styles.badgeTextFree}
-                >
-                  {item.subscribed ? "Active" : "Free"}
-                </Text>
-              </View>
-            </View>
-          ))}
+            );
+          })}
         </View>
         {!loading && recentUsers.length === 0 ? (
           <Text style={styles.emptyText}>No users found yet.</Text>
@@ -71,14 +93,17 @@ export default function RecentTables({
       {/* Recent Transactions Table */}
       <View style={styles.panel}>
         <View style={styles.panelHeader}>
-          <Text style={styles.panelTitle}>Recent Payments</Text>
+          <View>
+            <Text style={styles.panelTitle}>Recent Payments</Text>
+            <Text style={styles.panelSub}>M-Pesa request history</Text>
+          </View>
           <Text style={styles.linkText}>View All</Text>
         </View>
         <View style={styles.rowsContainer}>
-          {transactions.map((item) => (
-            <View key={item.id} style={styles.row}>
-              <View style={[styles.rowIconWrap, { backgroundColor: "rgba(16,185,129,0.08)" }]}>
-                <Ionicons name="receipt-outline" size={16} color={GREEN} />
+          {transactions.map((item, index) => (
+            <View key={item.id} style={[styles.row, index % 2 === 1 && styles.rowAlt]}>
+              <View style={[styles.rowIconWrap, { backgroundColor: "rgba(16,185,129,0.08)", borderColor: "rgba(16,185,129,0.2)" }]}>
+                <Ionicons name="receipt" size={16} color={GREEN} />
               </View>
               <View style={styles.rowMain}>
                 <Text style={styles.rowTitle}>{item.name}</Text>
@@ -101,7 +126,10 @@ export default function RecentTables({
       {/* Top Performing Facilities Table */}
       <View style={styles.panel}>
         <View style={styles.panelHeader}>
-          <Text style={styles.panelTitle}>Platform Summary</Text>
+          <View>
+            <Text style={styles.panelTitle}>Platform Summary</Text>
+            <Text style={styles.panelSub}>Consolidated network count</Text>
+          </View>
           <Text style={styles.linkText}>Overview</Text>
         </View>
         <View style={styles.rowsContainer}>
@@ -111,18 +139,27 @@ export default function RecentTables({
             ["Drug Records", formatNumber(drugs), "Reference data"],
             ["Active Users", formatNumber(activeUsers), "Subscribers"],
             ["Total Users", formatNumber(totalUsers), "Accounts"],
-          ].map(([name, count, label], index) => (
-            <View key={name} style={styles.rankRow}>
-              <View style={styles.rankBadge}>
-                <Text style={styles.rankText}>{index + 1}</Text>
+          ].map(([name, count, label], index) => {
+            const isGold = index === 0;
+            const isSilver = index === 1;
+            const isBronze = index === 2;
+            const badgeBg = isGold ? "#FEF3C7" : isSilver ? "#E2E8F0" : isBronze ? "#FFEDD5" : "#F1F5F9";
+            const badgeTextColor = isGold ? "#D97706" : isSilver ? "#475569" : isBronze ? "#D97706" : "#475569";
+            return (
+              <View key={name} style={[styles.rankRow, index % 2 === 1 && styles.rowAlt]}>
+                <View style={[styles.rankBadge, { backgroundColor: badgeBg }]}>
+                  <Text style={[styles.rankText, { color: badgeTextColor }]}>{index + 1}</Text>
+                </View>
+                <View style={styles.rankNameCol}>
+                  <Text style={styles.rankName}>{name}</Text>
+                  <Text style={styles.rowSub}>{label}</Text>
+                </View>
+                <View style={styles.rankCountBadge}>
+                  <Text style={styles.amount}>{count}</Text>
+                </View>
               </View>
-              <View style={styles.rankNameCol}>
-                <Text style={styles.rankName}>{name}</Text>
-                <Text style={styles.rowSub}>{label}</Text>
-              </View>
-              <Text style={styles.amount}>{count}</Text>
-            </View>
-          ))}
+            );
+          })}
         </View>
       </View>
     </View>
@@ -139,65 +176,82 @@ const styles = StyleSheet.create({
   panel: {
     backgroundColor: "#fff",
     borderRadius: 16,
-    padding: 20,
+    padding: 24,
     borderWidth: 1,
     borderColor: BORDER,
     flexGrow: 1,
     flexBasis: 292,
-    shadowColor: "#0F172A",
+    shadowColor: "#3B82F6",
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.03,
+    shadowOpacity: 0.05,
     shadowRadius: 16,
-    elevation: 2,
+    elevation: 3,
   },
   panelHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
+    alignItems: "flex-start",
     marginBottom: 16,
   },
   panelTitle: { color: TEXT_DARK, fontSize: 16, fontWeight: "800" },
+  panelSub: { color: TEXT_MUTED, fontSize: 11, fontWeight: "500", marginTop: 2 },
   linkText: { color: BLUE, fontSize: 12, fontWeight: "700" },
   rowsContainer: {
-    gap: 4,
+    gap: 2,
   },
   row: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "#F1F5F9",
-    paddingVertical: 12,
+    padding: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "transparent",
   },
-  rowIconWrap: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    backgroundColor: "rgba(59,130,246,0.08)",
+  rowAlt: {
+    backgroundColor: "#FAFBFD",
+    borderColor: "#F1F5F9",
+  },
+  rowAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
   },
-  rowMain: { flex: 1, minWidth: 110 },
+  avatarText: {
+    fontWeight: "800",
+    fontSize: 14,
+  },
+  rowIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+  },
+  rowMain: { flex: 1, minWidth: 100 },
   rowTitle: { color: TEXT_DARK, fontSize: 13, fontWeight: "700" },
   rowSub: { color: TEXT_MUTED, fontSize: 11, marginTop: 2, fontWeight: "500" },
   badgeActive: {
-    borderRadius: 8,
+    borderRadius: 20,
     backgroundColor: "#ECFDF5",
-    paddingHorizontal: 8,
+    paddingHorizontal: 10,
     paddingVertical: 4,
     borderWidth: 1,
     borderColor: "#A7F3D0",
   },
-  badgeTextActive: { color: GREEN, fontSize: 10, fontWeight: "700" },
+  badgeTextActive: { color: GREEN, fontSize: 10, fontWeight: "800" },
   badgeFree: {
-    borderRadius: 8,
+    borderRadius: 20,
     backgroundColor: "#F8FAFC",
-    paddingHorizontal: 8,
+    paddingHorizontal: 10,
     paddingVertical: 4,
     borderWidth: 1,
     borderColor: "#E2E8F0",
   },
-  badgeTextFree: { color: TEXT_MUTED, fontSize: 10, fontWeight: "700" },
+  badgeTextFree: { color: TEXT_MUTED, fontSize: 10, fontWeight: "800" },
   amountCol: { alignItems: "flex-end" },
   amount: { color: TEXT_DARK, fontSize: 13, fontWeight: "800" },
   emptyText: {
@@ -211,23 +265,30 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "#F1F5F9",
-    paddingVertical: 12,
+    padding: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "transparent",
   },
   rankBadge: {
-    width: 24,
-    height: 24,
+    width: 26,
+    height: 26,
     borderRadius: 8,
-    backgroundColor: "#F1F5F9",
     alignItems: "center",
     justifyContent: "center",
   },
   rankText: {
-    color: "#475569",
     fontWeight: "800",
-    fontSize: 11,
+    fontSize: 12,
   },
   rankNameCol: { flex: 1 },
   rankName: { color: TEXT_DARK, fontSize: 13, fontWeight: "700" },
+  rankCountBadge: {
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
 });

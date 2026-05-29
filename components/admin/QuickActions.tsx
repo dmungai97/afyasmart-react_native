@@ -46,25 +46,27 @@ export default function QuickActions() {
   return (
     <View style={styles.quickActions}>
       <View style={styles.quickHeader}>
-        <Text style={styles.panelTitle}>{STRINGS.quickActions}</Text>
-        <Text style={styles.sectionMeta}>{STRINGS.meta}</Text>
+        <View>
+          <Text style={styles.panelTitle}>{STRINGS.quickActions}</Text>
+          <Text style={styles.panelSub}>{STRINGS.meta}</Text>
+        </View>
       </View>
       <View style={styles.grid}>
         {actionsList.map(([icon, title, sub, color, route]) => (
           <TouchableOpacity
             key={title}
-            style={styles.actionCard}
+            style={[styles.actionCard, { borderLeftColor: color }]}
             onPress={() => router.push(route as any)}
             activeOpacity={0.7}
           >
-            <View style={[styles.actionIcon, { backgroundColor: `${color}10` }]}>
+            <View style={[styles.actionIcon, { backgroundColor: `${color}12`, borderColor: `${color}30` }]}>
               <Ionicons name={icon} size={18} color={color} />
             </View>
             <View style={styles.textContainer}>
               <Text style={styles.actionTitle}>{title}</Text>
               <Text style={styles.actionSub}>{sub}</Text>
             </View>
-            <Ionicons name="chevron-forward-outline" size={14} color={TEXT_MUTED} />
+            <Ionicons name="chevron-forward" size={14} color={color} />
           </TouchableOpacity>
         ))}
       </View>
@@ -78,23 +80,23 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
     borderColor: BORDER,
-    padding: 20,
+    padding: 24,
     gap: 16,
-    shadowColor: "#0F172A",
+    shadowColor: "#3B82F6",
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.03,
+    shadowOpacity: 0.05,
     shadowRadius: 16,
-    elevation: 2,
+    elevation: 3,
     width: "100%",
   },
   quickHeader: {
     width: "100%",
     flexDirection: "row",
-    alignItems: "baseline",
     justifyContent: "space-between",
+    marginBottom: 4,
   },
   panelTitle: { color: TEXT_DARK, fontSize: 16, fontWeight: "800" },
-  sectionMeta: { color: TEXT_MUTED, fontSize: 12, fontWeight: "600" },
+  panelSub: { color: TEXT_MUTED, fontSize: 11, fontWeight: "500", marginTop: 2 },
   grid: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -104,7 +106,7 @@ const styles = StyleSheet.create({
   actionCard: {
     flexGrow: 1,
     flexBasis: 240,
-    minHeight: 64,
+    minHeight: 68,
     borderRadius: 12,
     backgroundColor: "#FAFBFD",
     flexDirection: "row",
@@ -113,13 +115,15 @@ const styles = StyleSheet.create({
     padding: 14,
     borderWidth: 1,
     borderColor: "#F1F5F9",
+    borderLeftWidth: 4,
   },
   actionIcon: {
-    width: 36,
-    height: 36,
+    width: 38,
+    height: 38,
     borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
+    borderWidth: 1,
   },
   textContainer: { flex: 1 },
   actionTitle: { color: TEXT_DARK, fontSize: 13, fontWeight: "800" },

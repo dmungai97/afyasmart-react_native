@@ -151,9 +151,14 @@ export default function AdminTransactionsPage() {
           <View style={styles.titleRow}>
             {isMobile && (
               <TouchableOpacity style={styles.menuBtn} onPress={() => setMenuOpen(true)} activeOpacity={0.7}>
-                <Ionicons name="menu-outline" size={24} color="#34315A" />
+                <Ionicons name="menu-outline" size={24} color="#0B0F19" />
               </TouchableOpacity>
             )}
+            <View style={styles.backBtnWrap}>
+              <TouchableOpacity style={styles.backBtn} onPress={() => router.push("/admin")} activeOpacity={0.7}>
+                <Ionicons name="arrow-back" size={18} color="#0B0F19" />
+              </TouchableOpacity>
+            </View>
             <View>
               <Text style={styles.title}>{STRINGS.title}</Text>
               <Text style={styles.subtitle}>{STRINGS.subtitle}</Text>
@@ -166,17 +171,32 @@ export default function AdminTransactionsPage() {
 
         {/* KPI Summary */}
         <View style={styles.kpiRow}>
-          <View style={[styles.kpiCard, { borderLeftColor: GREEN }]}>
-            <Text style={styles.kpiLabel}>{STRINGS.totalRevenue}</Text>
-            <Text style={[styles.kpiValue, { color: GREEN }]}>{formatMoney(totalRevenue)}</Text>
+          <View style={[styles.kpiCard, { borderLeftColor: GREEN, shadowColor: GREEN }]}>
+            <View style={styles.kpiContent}>
+              <Text style={styles.kpiLabel}>{STRINGS.totalRevenue}</Text>
+              <Text style={[styles.kpiValue, { color: GREEN }]}>{formatMoney(totalRevenue)}</Text>
+            </View>
+            <View style={[styles.kpiIcon, { backgroundColor: `${GREEN}12`, borderColor: `${GREEN}30` }]}>
+              <Ionicons name="wallet" size={20} color={GREEN} />
+            </View>
           </View>
-          <View style={[styles.kpiCard, { borderLeftColor: BLUE }]}>
-            <Text style={styles.kpiLabel}>{STRINGS.totalPaid}</Text>
-            <Text style={[styles.kpiValue, { color: BLUE }]}>{totalPaid}</Text>
+          <View style={[styles.kpiCard, { borderLeftColor: BLUE, shadowColor: BLUE }]}>
+            <View style={styles.kpiContent}>
+              <Text style={styles.kpiLabel}>{STRINGS.totalPaid}</Text>
+              <Text style={[styles.kpiValue, { color: BLUE }]}>{totalPaid}</Text>
+            </View>
+            <View style={[styles.kpiIcon, { backgroundColor: `${BLUE}12`, borderColor: `${BLUE}30` }]}>
+              <Ionicons name="checkmark-circle" size={20} color={BLUE} />
+            </View>
           </View>
-          <View style={[styles.kpiCard, { borderLeftColor: ORANGE }]}>
-            <Text style={styles.kpiLabel}>{STRINGS.totalPending}</Text>
-            <Text style={[styles.kpiValue, { color: ORANGE }]}>{totalPending}</Text>
+          <View style={[styles.kpiCard, { borderLeftColor: ORANGE, shadowColor: ORANGE }]}>
+            <View style={styles.kpiContent}>
+              <Text style={styles.kpiLabel}>{STRINGS.totalPending}</Text>
+              <Text style={[styles.kpiValue, { color: ORANGE }]}>{totalPending}</Text>
+            </View>
+            <View style={[styles.kpiIcon, { backgroundColor: `${ORANGE}12`, borderColor: `${ORANGE}30` }]}>
+              <Ionicons name="time" size={20} color={ORANGE} />
+            </View>
           </View>
         </View>
 
@@ -227,7 +247,7 @@ export default function AdminTransactionsPage() {
               <Text style={styles.thCell}>{STRINGS.status}</Text>
             </View>
             {filtered.map((p, i) => (
-              <View key={p.id} style={[styles.tableRow, i % 2 === 0 && styles.tableRowAlt]}>
+              <View key={p.id} style={[styles.tableRow, i % 2 === 1 && styles.tableRowAlt]}>
                 <View style={{ flex: 2 }}>
                   <Text style={styles.cellPrimary}>{p.phone}</Text>
                   <Text style={styles.cellSub}>{p.createdAt}</Text>
@@ -247,22 +267,37 @@ export default function AdminTransactionsPage() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, flexDirection: "row", backgroundColor: "#F8FAFC" },
+  root: { flex: 1, flexDirection: "row", backgroundColor: "#F4F6FA" },
   main: { flex: 1 },
   content: { padding: 24, gap: 16 },
   backdrop: { position: "absolute", left: 0, top: 0, right: 0, bottom: 0, backgroundColor: "rgba(11,15,25,0.4)", zIndex: 998 },
   topbar: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   titleRow: { flexDirection: "row", alignItems: "center", gap: 12 },
+  backBtnWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: "#fff",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: BORDER,
+  },
+  backBtn: {
+    padding: 6,
+  },
   menuBtn: { padding: 6 },
-  title: { color: NAVY, fontSize: 22, fontWeight: "900", letterSpacing: -0.5 },
+  title: { color: "#0B0F19", fontSize: 24, fontWeight: "900", letterSpacing: -0.5 },
   subtitle: { color: MUTED, fontSize: 13, marginTop: 4, fontWeight: "500" },
-  refreshBtn: { width: 38, height: 38, borderRadius: 10, backgroundColor: "#fff", borderWidth: 1, borderColor: BORDER, alignItems: "center", justifyContent: "center" },
+  refreshBtn: { width: 38, height: 38, borderRadius: 12, backgroundColor: "#fff", borderWidth: 1, borderColor: BORDER, alignItems: "center", justifyContent: "center", shadowColor: "#0F172A", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.02, shadowRadius: 4 },
   kpiRow: { flexDirection: "row", gap: 12, flexWrap: "wrap" },
-  kpiCard: { flex: 1, minWidth: 160, backgroundColor: "#fff", borderRadius: 14, padding: 16, borderWidth: 1, borderColor: BORDER, borderLeftWidth: 4 },
-  kpiLabel: { color: MUTED, fontSize: 11, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5 },
-  kpiValue: { fontSize: 22, fontWeight: "900", marginTop: 8, letterSpacing: -0.5 },
-  searchRow: { flexDirection: "row", alignItems: "center", backgroundColor: "#fff", borderRadius: 12, borderWidth: 1, borderColor: BORDER, height: 44, gap: 8 },
-  searchInput: { flex: 1, color: NAVY, fontSize: 13, fontWeight: "500", paddingRight: 12 },
+  kpiCard: { flex: 1, minWidth: 160, backgroundColor: "#fff", borderRadius: 16, padding: 18, borderWidth: 1, borderColor: BORDER, borderLeftWidth: 5, flexDirection: "row", alignItems: "center", justifyContent: "space-between", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 10, elevation: 3 },
+  kpiContent: { flex: 1, paddingRight: 10 },
+  kpiLabel: { color: MUTED, fontSize: 10, fontWeight: "800", textTransform: "uppercase", letterSpacing: 0.6 },
+  kpiValue: { fontSize: 22, fontWeight: "900", marginTop: 6, letterSpacing: -0.5 },
+  kpiIcon: { width: 40, height: 40, borderRadius: 12, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  searchRow: { flexDirection: "row", alignItems: "center", backgroundColor: "#fff", borderRadius: 12, borderWidth: 1, borderColor: BORDER, height: 44, gap: 8, shadowColor: "#3B82F6", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.03, shadowRadius: 8 },
+  searchInput: { flex: 1, color: "#0B0F19", fontSize: 13, fontWeight: "500", paddingRight: 12 },
   filterRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, alignItems: "center" },
   filterChip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: "#fff", borderWidth: 1, borderColor: BORDER },
   filterChipActive: { backgroundColor: BLUE, borderColor: BLUE },
@@ -271,14 +306,14 @@ const styles = StyleSheet.create({
   countText: { color: MUTED, fontSize: 11, fontWeight: "600", marginLeft: "auto" },
   empty: { alignItems: "center", paddingTop: 60, gap: 12 },
   emptyText: { color: MUTED, fontSize: 15, fontWeight: "700" },
-  table: { backgroundColor: "#fff", borderRadius: 16, borderWidth: 1, borderColor: BORDER, overflow: "hidden" },
-  tableHeader: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 10, backgroundColor: "#F8FAFC", borderBottomWidth: 1, borderBottomColor: BORDER },
+  table: { backgroundColor: "#fff", borderRadius: 16, borderWidth: 1, borderColor: BORDER, overflow: "hidden", shadowColor: "#3B82F6", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.02, shadowRadius: 8 },
+  tableHeader: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 12, backgroundColor: "#F8FAFC", borderBottomWidth: 1, borderBottomColor: BORDER },
   thCell: { flex: 1, color: MUTED, fontSize: 10, fontWeight: "800", textTransform: "uppercase", letterSpacing: 0.5 },
-  tableRow: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: BORDER },
-  tableRowAlt: { backgroundColor: "#FAFBFF" },
-  cellPrimary: { color: NAVY, fontSize: 13, fontWeight: "700" },
+  tableRow: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: "#F1F5F9" },
+  tableRowAlt: { backgroundColor: "#FAFBFD" },
+  cellPrimary: { color: "#0B0F19", fontSize: 13, fontWeight: "700" },
   cellSub: { color: MUTED, fontSize: 10, fontWeight: "500", marginTop: 2 },
   tdCell: { flex: 1, color: MUTED, fontSize: 12, fontWeight: "600" },
-  statusBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 20 },
+  statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, borderWidth: 1, borderColor: "#E2E8F0" },
   statusText: { fontSize: 10, fontWeight: "800" },
 });
