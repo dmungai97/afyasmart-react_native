@@ -1,14 +1,11 @@
 import {
-  addDoc,
   collection,
-  doc,
   getDocs,
   limit as limitQuery,
   orderBy,
   query,
-  serverTimestamp,
-  updateDoc,
 } from "firebase/firestore";
+import Constants from "expo-constants";
 import { firebaseAuth, firestore } from "./firebase";
 import {
   FREE_CHAT_LIMIT,
@@ -48,28 +45,46 @@ export class ChatLimitError extends Error {
   }
 }
 
+// ── Resolve the Laravel API base URL (same constant as M-Pesa) ──────────────
+type FirebaseExtra = { mpesaApiBaseUrl?: string };
+const extra = (Constants.expoConfig?.extra?.firebase ?? {}) as FirebaseExtra;
+const chatApiBaseUrl =
+  process.env.EXPO_PUBLIC_MPESA_API_BASE_URL ??
+  extra.mpesaApiBaseUrl ??
+  "https://afyasmart-ey9q.onrender.com/api/v1";
+
+// ── Low-level POST helper (mirrors requestLaravelMpesa in mpesa.service.ts) ──
+const requestLaravelChat = async <T>(
+  path: string,
+  body: Record<string, unknown>,
+): Promise<T> => {
+  const firebase_uid = firebaseAuth.currentUser?.uid;
+  if (!firebase_uid) throw new Error("You must be signed in to use chat.");
+
+  const response = await fetch(`${chatApiBaseUrl}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ...body, firebase_uid }),
+  });
+
+  const data = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    if (response.status === 403 && data?.limit_reached) {
+      throw new ChatLimitError();
+    }
+    throw new Error(data?.message ?? "Chat request failed.");
+  }
+
+  return data as T;
+};
+
+// ── Public API ───────────────────────────────────────────────────────────────
+
 const requireUid = () => {
   const uid = firebaseAuth.currentUser?.uid;
   if (!uid) throw new Error("You must be signed in to use chat.");
   return uid;
-};
-
-const buildReply = (message: string) => {
-  const text = message.toLowerCase();
-
-  if (text.includes("headache")) {
-    return "Headaches can be caused by dehydration, stress, or lack of sleep. Try drinking water and resting. If it persists, consult a doctor.";
-  }
-
-  if (text.includes("fever")) {
-    return "A fever above 38°C may indicate infection. Rest, stay hydrated, and seek medical attention if it exceeds 39.5°C or lasts more than 3 days.";
-  }
-
-  if (text.includes("hello") || text.includes("hi")) {
-    return "Hello! I am AfyaSmart AI. How can I help you with your health question today?";
-  }
-
-  return "Thank you for your question. For accurate medical advice, please consult a licensed healthcare provider.";
 };
 
 export const getChatStatus = async (
@@ -77,6 +92,8 @@ export const getChatStatus = async (
 ): Promise<ChatStatusResponse> => {
   void token;
   requireUid();
+
+  // Fall back to local Firestore profile when the Laravel user row doesn't exist yet
   const { getCurrentUserProfile } = await import("./auth.service");
   const user = await getCurrentUserProfile();
   const chatCount = user?.chat_count ?? 0;
@@ -98,42 +115,24 @@ export const getChatStatus = async (
 export const sendMessage = async (
   message: string,
   token: string | null,
+  history: ChatMessage[] = [],
 ): Promise<SendMessageResponse> => {
   void token;
-  const uid = requireUid();
-  const status = await getChatStatus(null);
+  requireUid();
 
+  // Pre-flight limit check using local profile (fast, avoids a round-trip)
+  const status = await getChatStatus(null);
   if (!status.is_subscribed && status.limit_reached) {
     throw new ChatLimitError();
   }
 
-  const reply = buildReply(message);
-  const nextCount = status.chat_count + 1;
-  const messagesRef = collection(firestore, "users", uid, "chatMessages");
-
-  await addDoc(messagesRef, {
-    role: "user",
-    text: message,
-    created_at: serverTimestamp(),
+  // Delegate AI reply to the Laravel API (OpenAI key stays on the server)
+  const data = await requestLaravelChat<SendMessageResponse>("/chat/send", {
+    message,
+    history,
   });
 
-  await addDoc(messagesRef, {
-    role: "ai",
-    text: reply,
-    created_at: serverTimestamp(),
-  });
-
-  await updateDoc(doc(firestore, "users", uid), {
-    chat_count: nextCount,
-    updated_at: serverTimestamp(),
-  });
-
-  return {
-    reply,
-    chat_count: nextCount,
-    limit: FREE_CHAT_LIMIT,
-    is_subscribed: status.is_subscribed,
-  };
+  return data;
 };
 
 export const getChatHistory = async (
@@ -141,6 +140,8 @@ export const getChatHistory = async (
 ): Promise<ChatHistoryResponse> => {
   void token;
   const uid = requireUid();
+
+  // Chat history is stored in Firestore by the React Native app itself
   const q = query(
     collection(firestore, "users", uid, "chatMessages"),
     orderBy("created_at", "asc"),

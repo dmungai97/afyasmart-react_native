@@ -6,6 +6,33 @@
     "paths": {
       "@/*": [
         "./*"
+      ],
+      "@admin/*": [
+        "./admin/*"
+      ],
+      "@auth": [
+        "./src/auth"
+      ],
+      "@auth/*": [
+        "./src/auth/*"
+      ],
+      "@onboarding": [
+        "./src/onboarding"
+      ],
+      "@onboarding/*": [
+        "./src/onboarding/*"
+      ],
+      "@user": [
+        "./src/user"
+      ],
+      "@user/*": [
+        "./src/user/*"
+      ],
+      "@affiliate": [
+        "./affiliate"
+      ],
+      "@affiliate/*": [
+        "./affiliate/*"
       ]
     }
   },

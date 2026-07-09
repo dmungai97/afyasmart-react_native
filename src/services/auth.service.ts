@@ -55,24 +55,40 @@ const normalizeDateValue = (value: any): string | null => {
   return null;
 };
 
-export const normalizeUser = (id: string, data: any): AuthUser => ({
-  id,
-  name: data?.name ?? data?.displayName ?? "AfyaSmart User",
-  email: data?.email ?? "",
-  phone: data?.phone ?? undefined,
-  role: data?.role === "admin" || data?.role === "super_admin" ? data.role : "user",
-  is_subscribed: Boolean(data?.is_subscribed),
-  has_subscribed: Boolean(
-    data?.has_subscribed
-      || data?.is_subscribed
-      || data?.subscription_expires_at
-      || ["daily", "weekly", "monthly"].includes(data?.subscription_plan),
-  ),
-  onboarding_completed: Boolean(data?.onboarding_completed),
-  subscription_plan: data?.subscription_plan ?? "free",
-  chat_count: Number(data?.chat_count ?? 0),
-  subscription_expires_at: normalizeDateValue(data?.subscription_expires_at),
-});
+const isStoredSubscriptionActive = (isSubscribed: unknown, expiresAt: string | null) => {
+  if (!isSubscribed) return false;
+  if (!expiresAt) return true;
+
+  const expiryTime = new Date(expiresAt).getTime();
+  return Number.isFinite(expiryTime) && expiryTime > Date.now();
+};
+
+export const normalizeUser = (id: string, data: any): AuthUser => {
+  const subscriptionExpiresAt = normalizeDateValue(data?.subscription_expires_at);
+  const isSubscribed = isStoredSubscriptionActive(
+    data?.is_subscribed,
+    subscriptionExpiresAt,
+  );
+
+  return {
+    id,
+    name: data?.name ?? data?.displayName ?? "AfyaSmart User",
+    email: data?.email ?? "",
+    phone: data?.phone ?? undefined,
+    role: data?.role === "admin" || data?.role === "super_admin" ? data.role : "user",
+    is_subscribed: isSubscribed,
+    has_subscribed: Boolean(
+      data?.has_subscribed
+        || data?.is_subscribed
+        || subscriptionExpiresAt
+        || ["daily", "weekly", "monthly"].includes(data?.subscription_plan),
+    ),
+    onboarding_completed: Boolean(data?.onboarding_completed),
+    subscription_plan: data?.subscription_plan ?? "free",
+    chat_count: Number(data?.chat_count ?? 0),
+    subscription_expires_at: subscriptionExpiresAt,
+  };
+};
 
 const getOrCreateCurrentUserProfile = async (): Promise<{
   user: AuthUser | null;

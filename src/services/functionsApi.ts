@@ -25,7 +25,7 @@ export class FunctionApiError extends Error {
   data: any;
 
   constructor(status: number, data: any) {
-    super(data?.message ?? "Firebase function request failed.");
+    super(data?.error?.message ?? data?.message ?? "Firebase function request failed.");
     this.name = "FunctionApiError";
     this.status = status;
     this.data = data;
@@ -45,7 +45,7 @@ export const callFunction = async <T>(
   }
 
   const idToken =
-    options.token ?? (await firebaseAuth.currentUser?.getIdToken());
+    (await firebaseAuth.currentUser?.getIdToken()) ?? options.token;
 
   const response = await fetch(`${baseUrl}/${name}`, {
     method: options.method ?? "POST",

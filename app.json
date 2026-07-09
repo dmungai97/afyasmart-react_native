@@ -3,9 +3,28 @@
     "name": "AfyaSmart",
     "slug": "afyasmart",
     "scheme": "afyasmart",
+    "icon": "./assets/images/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true
+    },
     "android": {
+      "allowBackup": false,
       "softwareKeyboardLayoutMode": "resize",
-      "package": "com.afyasmart.app"
+      "package": "com.afyasmart.app",
+      "minSdkVersion": 24,
+      "targetSdkVersion": 35,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "backgroundColor": "#0B6E6E"
+      }
+    },
+    "androidNavigationBar": {
+      "visible": "always",
+      "backgroundColor": "#ffffff"
+    },
+    "web": {
+      "favicon": "./assets/images/favicon.png"
     },
     "updates": {
       "enabled": false,
@@ -22,8 +41,7 @@
         "appId": "1:485330882915:web:b18e7d9d2427ba55e14356",
         "measurementId": "G-PGTPT6FZGE",
         "googleWebClientId": "485330882915-0f3f3hlv83abmu911r9jgaq8rm914uj0.apps.googleusercontent.com",
-        // "googleAndroidClientId": "",
-        // "googleIosClientId": "",
+        "googleAndroidClientId": "485330882915-sn8ashjoflvl5ffbnr292kj35gloo1nu.apps.googleusercontent.com",
         "functionsRegion": "us-central1",
         "functionsBaseUrl": "https://us-central1-afya-smart-377ad.cloudfunctions.net",
         "mpesaApiBaseUrl": "https://afyasmart-ey9q.onrender.com/api/v1"

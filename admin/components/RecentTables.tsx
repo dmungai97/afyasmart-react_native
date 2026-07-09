@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { StyleSheet, Text, View } from "react-native";
-import { AdminRecentUser, AdminTransaction } from "../../src/services/admin.service";
+import { AdminRecentUser, AdminTransaction } from "@admin/services/admin.service";
 
 const SLATE_DARK = "#1E293B";
 const SLATE_MID = "#475569";
@@ -16,6 +16,7 @@ interface RecentTablesProps {
   drugs: number;
   activeUsers: number;
   loading: boolean;
+  isMobile?: boolean;
 }
 
 const formatNumber = (value: number) =>
@@ -32,11 +33,12 @@ export default function RecentTables({
   drugs,
   activeUsers,
   loading,
+  isMobile = false,
 }: RecentTablesProps) {
   return (
-    <View style={styles.tablesGrid}>
+    <View style={[styles.tablesGrid, isMobile && styles.tablesGridMobile]}>
       {/* Recent Users Table */}
-      <View style={styles.panel}>
+      <View style={[styles.panel, isMobile && styles.panelMobile]}>
         <View style={styles.panelHeader}>
           <View>
             <Text style={styles.panelTitle}>Recent Users</Text>
@@ -47,19 +49,19 @@ export default function RecentTables({
         <View style={styles.rowsContainer}>
           {(recentUsers.length > 0 ? recentUsers : []).map((item, index) => {
             return (
-              <View key={item.id} style={[styles.row, index === (recentUsers.length - 1) && { borderBottomWidth: 0 }]}>
+              <View key={item.id} style={[styles.row, isMobile && styles.rowMobile, index === (recentUsers.length - 1) && { borderBottomWidth: 0 }]}>
                 <View style={styles.rowAvatar}>
                   <Text style={styles.avatarText}>
                     {(item.name[0] ?? "U").toUpperCase()}
                   </Text>
                 </View>
                 <View style={styles.rowMain}>
-                  <Text style={styles.rowTitle}>{item.name}</Text>
-                  <Text style={styles.rowSub}>{item.email || "No email saved"}</Text>
+                  <Text style={styles.rowTitle} numberOfLines={1}>{item.name}</Text>
+                  <Text style={styles.rowSub} numberOfLines={1}>{item.email || "No email saved"}</Text>
                 </View>
                 <View style={item.subscribed ? styles.badgeActive : styles.badgeFree}>
                   <Text
-                    style={item.subscribed ? styles.badgeTextActive : styles.badgeTextFree}
+                     style={item.subscribed ? styles.badgeTextActive : styles.badgeTextFree}
                   >
                     {item.subscribed ? "Active" : "Free"}
                   </Text>
@@ -74,7 +76,7 @@ export default function RecentTables({
       </View>
 
       {/* Recent Transactions Table */}
-      <View style={styles.panel}>
+      <View style={[styles.panel, isMobile && styles.panelMobile]}>
         <View style={styles.panelHeader}>
           <View>
             <Text style={styles.panelTitle}>Recent Payments</Text>
@@ -84,17 +86,17 @@ export default function RecentTables({
         </View>
         <View style={styles.rowsContainer}>
           {transactions.map((item, index) => (
-            <View key={item.id} style={[styles.row, index === (transactions.length - 1) && { borderBottomWidth: 0 }]}>
+            <View key={item.id} style={[styles.row, isMobile && styles.rowMobile, index === (transactions.length - 1) && { borderBottomWidth: 0 }]}>
               <View style={styles.rowIconWrap}>
                 <Ionicons name="receipt-outline" size={16} color={SLATE_MID} />
               </View>
               <View style={styles.rowMain}>
-                <Text style={styles.rowTitle}>{item.name}</Text>
-                <Text style={styles.rowSub}>{item.type}</Text>
+                <Text style={styles.rowTitle} numberOfLines={1}>{item.name}</Text>
+                <Text style={styles.rowSub} numberOfLines={1}>{item.type}</Text>
               </View>
-              <View style={styles.amountCol}>
-                <Text style={styles.amount}>{formatMoney(item.amount)}</Text>
-                <Text style={styles.rowSub}>{item.time}</Text>
+              <View style={[styles.amountCol, isMobile && styles.amountColMobile]}>
+                <Text style={styles.amount} numberOfLines={1}>{formatMoney(item.amount)}</Text>
+                <Text style={styles.rowSub} numberOfLines={1}>{item.time}</Text>
               </View>
             </View>
           ))}
@@ -107,7 +109,7 @@ export default function RecentTables({
       </View>
 
       {/* Platform Summary Table */}
-      <View style={styles.panel}>
+      <View style={[styles.panel, isMobile && styles.panelMobile]}>
         <View style={styles.panelHeader}>
           <View>
             <Text style={styles.panelTitle}>Platform Summary</Text>
@@ -163,6 +165,15 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 1,
   },
+  panelMobile: {
+    flexBasis: "100%",
+    flexGrow: 0,
+    width: "100%",
+    padding: 12,
+  },
+  tablesGridMobile: {
+    gap: 12,
+  },
   panelHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -180,6 +191,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#F1F5F9",
     paddingVertical: 10,
+  },
+  rowMobile: {
+    gap: 8,
   },
   rowAvatar: {
     width: 36,
@@ -202,7 +216,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  rowMain: { flex: 1, minWidth: 100 },
+  rowMain: { flex: 1, minWidth: 0 },
   rowTitle: { color: SLATE_DARK, fontSize: 13, fontWeight: "600" },
   rowSub: { color: SLATE_LIGHT, fontSize: 11, marginTop: 2, fontWeight: "500" },
   badgeActive: {
@@ -222,6 +236,7 @@ const styles = StyleSheet.create({
   },
   badgeTextFree: { color: SLATE_LIGHT, fontSize: 10, fontWeight: "600" },
   amountCol: { alignItems: "flex-end" },
+  amountColMobile: { maxWidth: 96 },
   amount: { color: SLATE_DARK, fontSize: 13, fontWeight: "700" },
   emptyText: {
     color: SLATE_LIGHT,

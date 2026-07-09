@@ -36,6 +36,10 @@ type AuthState = {
   refreshUser: (token: string) => Promise<void>;
 };
 
+const clearPersistedAuth = async () => {
+  await AsyncStorage.multiRemove(["token", "user", "hasCompletedOnboarding"]);
+};
+
 export const useAuthStore = create<AuthState>((set, get) => ({
   token: null,
   user: null,
@@ -47,7 +51,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     const hasOnboarded = onboarded === "true" || user.onboarding_completed;
     const updatedUser = { ...user, onboarding_completed: hasOnboarded };
 
-    await AsyncStorage.setItem("token", token);
     await AsyncStorage.setItem("user", JSON.stringify(updatedUser));
     if (hasOnboarded) await AsyncStorage.setItem("hasCompletedOnboarding", "true");
     set({
@@ -75,9 +78,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       // Local state should still clear if Firebase sign-out is unavailable.
     }
 
-    await AsyncStorage.removeItem("token");
-    await AsyncStorage.removeItem("user");
-    await AsyncStorage.removeItem("hasCompletedOnboarding");
+    await clearPersistedAuth();
     set({
       token: null,
       user: null,
@@ -87,16 +88,26 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   loadAuth: async () => {
-    const token = await AsyncStorage.getItem("token");
-    const raw = await AsyncStorage.getItem("user");
-    const onboarded = await AsyncStorage.getItem("hasCompletedOnboarding");
-    const user: User | null = raw ? JSON.parse(raw) : null;
-    set({
-      token: token ?? null,
-      user,
-      hasCompletedOnboarding: onboarded === "true" || Boolean(user?.onboarding_completed),
-      isNewUser: false,
-    });
+    try {
+      await AsyncStorage.removeItem("token");
+      const raw = await AsyncStorage.getItem("user");
+      const onboarded = await AsyncStorage.getItem("hasCompletedOnboarding");
+      const user: User | null = raw ? JSON.parse(raw) : null;
+      set({
+        token: null,
+        user,
+        hasCompletedOnboarding: onboarded === "true" || Boolean(user?.onboarding_completed),
+        isNewUser: false,
+      });
+    } catch {
+      await clearPersistedAuth();
+      set({
+        token: null,
+        user: null,
+        hasCompletedOnboarding: false,
+        isNewUser: false,
+      });
+    }
   },
 
   completeOnboarding: async () => {
@@ -147,17 +158,43 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       const { getCurrentUserProfile } = await import("../services/auth.service");
       const { firebaseAuth } = await import("../services/firebase");
+      const current = firebaseAuth.currentUser;
+
+      if (!current) {
+        await clearPersistedAuth();
+        set({
+          token: null,
+          user: null,
+          hasCompletedOnboarding: false,
+          isNewUser: false,
+        });
+        return;
+      }
+
       const user = await getCurrentUserProfile();
       if (!user) return;
 
-      const freshToken = await firebaseAuth.currentUser?.getIdToken();
+      const freshToken = await current.getIdToken();
+      const hasOnboarded = get().hasCompletedOnboarding || user.onboarding_completed;
+      const updatedUser = { ...user, onboarding_completed: hasOnboarded };
 
-      await AsyncStorage.setItem("user", JSON.stringify(user));
-      if (freshToken) await AsyncStorage.setItem("token", freshToken);
-      set({ user, token: freshToken ?? token });
+      await AsyncStorage.setItem("user", JSON.stringify(updatedUser));
+      if (hasOnboarded) await AsyncStorage.setItem("hasCompletedOnboarding", "true");
+      set({
+        user: updatedUser,
+        token: freshToken ?? token,
+        hasCompletedOnboarding: hasOnboarded,
+        isNewUser: false,
+      });
     } catch (error) {
       console.error("Failed to refresh user", error);
-      // silently fail — stale data is acceptable
+      await clearPersistedAuth();
+      set({
+        token: null,
+        user: null,
+        hasCompletedOnboarding: false,
+        isNewUser: false,
+      });
     }
   },
 }));

@@ -99,8 +99,8 @@ export const initiateMpesa = async (
 export const pollMpesaStatus = async (
   token: string | null,
   checkoutRequestId: string,
-): Promise<{ paid: boolean; status: string }> => {
-  const data = await requestLaravelMpesa<{ paid: boolean; status: string }>(
+): Promise<{ paid: boolean; status: string; message?: string }> => {
+  const data = await requestLaravelMpesa<{ paid: boolean; status: string; message?: string }>(
     "/mpesa/status",
     { checkout_request_id: checkoutRequestId },
     token,
@@ -141,7 +141,7 @@ export const pollMpesaStatus = async (
 
 export const checkLatestMpesaPayment = async (
   token: string | null,
-): Promise<{ paid: boolean; status: string; checkout_request_id: string } | null> => {
+): Promise<{ paid: boolean; status: string; checkout_request_id: string; message?: string } | null> => {
   const checkoutRequestId = await AsyncStorage.getItem(lastCheckoutKey);
   if (!checkoutRequestId) return null;
 

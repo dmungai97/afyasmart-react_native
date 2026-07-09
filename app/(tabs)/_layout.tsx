@@ -1,38 +1,66 @@
 import { Tabs } from 'expo-router';
-import { View, Platform } from 'react-native';
+import { View, Text, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStore } from '../../src/store/authStore';
 import { isSubscriptionActive } from '../../src/services/subscription.model';
 
-const TEAL = '#0B6E6E';
+const TEAL = '#005454'; // Match the exact dark teal primary color
 
-function TabIcon({
+function TabItem({
   name,
+  label,
   focused,
+  badge,
 }: {
   name: keyof typeof Ionicons.glyphMap;
+  label: string;
   focused: boolean;
+  badge?: boolean;
 }) {
   return (
     <View
       style={{
         alignItems: 'center',
         justifyContent: 'center',
-        marginTop: 4,
-        width: 46,
-        height: 34,
-        borderRadius: 14,
-        backgroundColor: focused
-          ? 'rgba(11,110,110,0.12)'
-          : 'transparent',
+        paddingHorizontal: 22,
+        paddingVertical: 10,
+        borderRadius: 24,
+        backgroundColor: focused ? TEAL : 'transparent',
+        minWidth: 76,
+        height: 52,
+        gap: 2,
       }}
     >
-      <Ionicons
-        name={name}
-        size={22}
-        color={focused ? TEAL : '#9aa0a6'}
-      />
+      <View style={{ position: 'relative' }}>
+        <Ionicons
+          name={name}
+          size={20}
+          color={focused ? '#ffffff' : '#718096'}
+        />
+        {badge && !focused && (
+          <View
+            style={{
+              position: 'absolute',
+              right: -4,
+              top: -2,
+              width: 6,
+              height: 6,
+              borderRadius: 3,
+              backgroundColor: '#ba1a1a', // red badge dot
+            }}
+          />
+        )}
+      </View>
+      <Text
+        style={{
+          fontSize: 10,
+          fontWeight: '700',
+          color: focused ? '#ffffff' : '#718096',
+        }}
+      >
+        {label}
+      </Text>
     </View>
   );
 }
@@ -46,65 +74,39 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-
+        tabBarShowLabel: false, // Custom tabs handle the label inside TabItem
         tabBarActiveTintColor: TEAL,
-        tabBarInactiveTintColor: '#9aa0a6',
-
-        // Keep the floating tab bar out of the keyboard path.
+        tabBarInactiveTintColor: '#A0AEC0',
         tabBarHideOnKeyboard: true,
 
         tabBarStyle: {
           position: 'absolute',
-
+          bottom: 0,
+          left: 0,
+          right: 0,
           backgroundColor: '#ffffff',
-
           borderTopWidth: 1,
           borderTopColor: '#edf0f2',
 
-          // better height handling
-          height:
-            Platform.OS === 'android'
-              ? 72 + insets.bottom
-              : 82 + insets.bottom,
-
+          // Dynamic height based on safe area insets
+          height: Platform.OS === 'android' ? 72 : 64 + insets.bottom,
           paddingTop: 8,
+          paddingBottom: Platform.OS === 'android' ? 12 : insets.bottom + 6,
 
-          // important fix
-          paddingBottom:
-            Platform.OS === 'android'
-              ? Math.max(insets.bottom, 10)
-              : insets.bottom,
-
-          // floating modern look
-          marginHorizontal: 14,
-          marginBottom:
-            Platform.OS === 'android'
-              ? 10
-              : 0,
-
-          borderRadius: 22,
-
-          // shadow
-          elevation: 10,
-
-          shadowColor: '#000',
-          shadowOpacity: 0.06,
-          shadowRadius: 12,
+          // Premium soft shadow at the top of the bar
+          elevation: 8,
+          shadowColor: '#000000',
+          shadowOpacity: 0.05,
+          shadowRadius: 10,
           shadowOffset: {
             width: 0,
-            height: 4,
+            height: -4,
           },
         },
 
-        tabBarLabelStyle: {
-          fontSize: 11,
-          fontWeight: '700',
-          marginTop: -2,
-          paddingBottom: 2,
-        },
-
         tabBarItemStyle: {
-          paddingVertical: 4,
+          justifyContent: 'center',
+          alignItems: 'center',
         },
       }}
     >
@@ -113,12 +115,9 @@ export default function TabLayout() {
         options={{
           title: 'Home',
           tabBarIcon: ({ focused }) => (
-            <TabIcon
-              name={
-                focused
-                  ? 'home'
-                  : 'home-outline'
-              }
+            <TabItem
+              name={focused ? 'home' : 'home-outline'}
+              label="Home"
               focused={focused}
             />
           ),
@@ -131,12 +130,9 @@ export default function TabLayout() {
           href: hasFullAccess ? undefined : null,
           title: 'Doctors',
           tabBarIcon: ({ focused }) => (
-            <TabIcon
-              name={
-                focused
-                  ? 'people'
-                  : 'people-outline'
-              }
+            <TabItem
+              name={focused ? 'people' : 'people-outline'}
+              label="Doctors"
               focused={focused}
             />
           ),
@@ -149,12 +145,9 @@ export default function TabLayout() {
           href: hasFullAccess ? undefined : null,
           title: 'Map',
           tabBarIcon: ({ focused }) => (
-            <TabIcon
-              name={
-                focused
-                  ? 'location'
-                  : 'location-outline'
-              }
+            <TabItem
+              name={focused ? 'location' : 'location-outline'}
+              label="Map"
               focused={focused}
             />
           ),
@@ -166,13 +159,11 @@ export default function TabLayout() {
         options={{
           title: 'Chat',
           tabBarIcon: ({ focused }) => (
-            <TabIcon
-              name={
-                focused
-                  ? 'chatbubble'
-                  : 'chatbubble-outline'
-              }
+            <TabItem
+              name={focused ? 'chatbubble' : 'chatbubble-outline'}
+              label="Chat"
               focused={focused}
+              badge={true}
             />
           ),
         }}
@@ -183,12 +174,9 @@ export default function TabLayout() {
         options={{
           title: 'Profile',
           tabBarIcon: ({ focused }) => (
-            <TabIcon
-              name={
-                focused
-                  ? 'person'
-                  : 'person-outline'
-              }
+            <TabItem
+              name={focused ? 'person' : 'person-outline'}
+              label="Profile"
               focused={focused}
             />
           ),

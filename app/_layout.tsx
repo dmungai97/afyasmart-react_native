@@ -1,7 +1,18 @@
 import { Slot, useRouter, useSegments } from "expo-router";
 import { useEffect, useState } from "react";
+import { onAuthStateChanged, User as FirebaseUser } from "firebase/auth";
 import { useAuthStore } from "../src/store/authStore";
+import { firebaseAuth } from "../src/services/firebase";
 import { isSubscriptionActive } from "../src/services/subscription.model";
+
+const waitForFirebaseAuth = () =>
+  new Promise<FirebaseUser | null>((resolve) => {
+    let unsubscribe = () => {};
+    unsubscribe = onAuthStateChanged(firebaseAuth, (firebaseUser) => {
+      unsubscribe();
+      resolve(firebaseUser);
+    });
+  });
 
 export default function RootLayout() {
   const token = useAuthStore((s) => s.token);
@@ -10,6 +21,7 @@ export default function RootLayout() {
   const isNewUser = useAuthStore((s) => s.isNewUser);
   const loadAuth = useAuthStore((s) => s.loadAuth);
   const refreshUser = useAuthStore((s) => s.refreshUser);
+  const clearAuth = useAuthStore((s) => s.clearAuth);
   const segments = useSegments();
   const router = useRouter();
   const [authLoaded, setAuthLoaded] = useState(false);
@@ -17,19 +29,36 @@ export default function RootLayout() {
   useEffect(() => {
     let mounted = true;
 
-    loadAuth()
-      .then(async () => {
-        const currentToken = useAuthStore.getState().token;
-        if (currentToken) await refreshUser(currentToken);
-      })
-      .finally(() => {
-        if (mounted) setAuthLoaded(true);
-      });
+    const hydrateAuth = async () => {
+      await loadAuth();
+      const firebaseUser = await waitForFirebaseAuth();
+      const currentToken = useAuthStore.getState().token;
+      const cachedUser = useAuthStore.getState().user;
+
+      if (firebaseUser) {
+        const idToken = currentToken ?? (await firebaseUser.getIdToken());
+        await refreshUser(idToken);
+        return;
+      }
+
+      if (currentToken) {
+        await clearAuth();
+        return;
+      }
+
+      if (cachedUser) {
+        await clearAuth();
+      }
+    };
+
+    hydrateAuth().finally(() => {
+      if (mounted) setAuthLoaded(true);
+    });
 
     return () => {
       mounted = false;
     };
-  }, [loadAuth, refreshUser]);
+  }, [clearAuth, loadAuth, refreshUser]);
 
   useEffect(() => {
     if (!authLoaded) return;
@@ -76,6 +105,7 @@ export default function RootLayout() {
     ].includes(current);
     const inSubscription = first === "subscription" || current === "subscription";
     const inAdmin = first === "admin";
+    const inAffiliate = first === "affiliate";
     const onWelcome = first === "welcome" || current === "welcome";
     const onRoot = first === "index" || first === "";
     const premiumRoutes = ["diagnosis-results", "doctors", "drugs", "map", "pharmacy", "symptoms"];
@@ -84,13 +114,25 @@ export default function RootLayout() {
     const needsOnboarding =
       isNewUser && !hasCompletedOnboarding && !user?.onboarding_completed;
 
+    if (inAffiliate) {
+      if (!token) {
+        router.replace("/(auth)/login" as any);
+      }
+      return;
+    }
+
     if (!token) {
-      if (inAdmin) {
+      if (inAdmin || inTabs) {
         router.replace("/(auth)/login" as any);
         return;
       }
 
-      if (!inAuth && !inOnboarding && !onRoot && !onWelcome)
+      if (onRoot) {
+        router.replace("/(onboarding)/welcome" as any);
+        return;
+      }
+
+      if (!inAuth && !inOnboarding && !onWelcome)
         router.replace("/(onboarding)/welcome" as any);
       return;
     }
@@ -132,6 +174,8 @@ export default function RootLayout() {
       router.replace("/(tabs)" as any);
     }
   }, [authLoaded, token, user, hasCompletedOnboarding, isNewUser, segments, router]);
+
+  if (!authLoaded) return null;
 
   return <Slot />;
 }

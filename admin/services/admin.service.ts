@@ -2,6 +2,7 @@ import {
   collection,
   doc,
   getCountFromServer,
+  getDoc,
   getDocs,
   addDoc,
   updateDoc,
@@ -10,9 +11,10 @@ import {
   orderBy,
   query,
   serverTimestamp,
+  Timestamp,
   where,
 } from "firebase/firestore";
-import { firestore } from "./firebase";
+import { firestore } from "@/src/services/firebase";
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -50,6 +52,23 @@ export const paymentAmount = (data: any) => {
   return 0;
 };
 
+const getDateValue = (value: any) => {
+  if (!value) return null;
+  const date =
+    typeof value.toDate === "function"
+      ? value.toDate()
+      : new Date(value);
+
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
+const isActiveSubscription = (data: any) => {
+  if (!data?.is_subscribed) return false;
+
+  const expiresAt = getDateValue(data.subscription_expires_at);
+  return !expiresAt || expiresAt > new Date();
+};
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export type AdminMetric = {
@@ -62,6 +81,9 @@ export type AdminMetric = {
   totalFacilities: number;
   totalRevenue: number;
   pendingPayouts: number;
+  pendingPayoutsValue: number;
+  planCounts: { daily: number; weekly: number; monthly: number };
+  conversionRate: number;
 };
 
 export type AdminRecentUser = {
@@ -85,6 +107,8 @@ export type AdminDashboardData = {
   metrics: AdminMetric;
   recentUsers: AdminRecentUser[];
   recentTransactions: AdminTransaction[];
+  weeklyRevenue?: number[];
+  weeklySubscribers?: number[];
 };
 
 export type AdminUser = {
@@ -97,6 +121,7 @@ export type AdminUser = {
   isSubscribed: boolean;
   hasSubscribed: boolean;
   subscriptionExpiresAt: string | null;
+  isExpired?: boolean;
   onboardingCompleted: boolean;
   createdAt: string;
 };
@@ -146,15 +171,39 @@ const countQuery = async (collectionName: string, field: string, value: unknown)
 };
 
 export const fetchAdminDashboardData = async (): Promise<AdminDashboardData> => {
-  const [totalUsers, activeUsers, subscriptions, doctors, pharmacies, drugs] =
+  const [totalUsers, activeUsersSnap, subscriptions, doctors, pharmacies, drugs] =
     await Promise.all([
       countCollection("users"),
-      countQuery("users", "is_subscribed", true),
+      getDocs(query(collection(firestore, "users"), where("is_subscribed", "==", true))),
       countQuery("users", "has_subscribed", true),
       countCollection("doctors"),
       countCollection("pharmacies"),
       countCollection("drugs"),
     ]);
+
+  let daily = 0;
+  let weekly = 0;
+  let monthly = 0;
+  const activeUsers = activeUsersSnap.docs.filter((item) => {
+    const data = item.data();
+    const active = isActiveSubscription(data);
+    if (active) {
+      const plan = data.subscription_plan;
+      if (plan === "daily") daily++;
+      else if (plan === "weekly") weekly++;
+      else if (plan === "monthly") monthly++;
+    }
+    return active;
+  }).length;
+
+  const now = new Date();
+  const day = now.getDay();
+  const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+  const startOfWeek = new Date(now.setDate(diff));
+  startOfWeek.setHours(0, 0, 0, 0);
+
+  const weeklyRevenue = [0, 0, 0, 0, 0, 0, 0];
+  const weeklySubscribers = [0, 0, 0, 0, 0, 0, 0];
 
   let paidTransactions: AdminTransaction[] = [];
   let totalRevenue = 0;
@@ -166,6 +215,17 @@ export const fetchAdminDashboardData = async (): Promise<AdminDashboardData> => 
       const data = item.data();
       const amount = paymentAmount(data);
       totalRevenue += amount;
+
+      const dateVal = data.paid_at ?? data.created_at;
+      const date = dateVal?.toDate ? dateVal.toDate() : new Date(dateVal);
+      if (!Number.isNaN(date.getTime()) && date >= startOfWeek) {
+        const dayIndex = date.getDay() === 0 ? 6 : date.getDay() - 1;
+        if (dayIndex >= 0 && dayIndex < 7) {
+          weeklyRevenue[dayIndex] += amount;
+          weeklySubscribers[dayIndex] += 1;
+        }
+      }
+
       return {
         id: item.id,
         name: data.phone ?? data.uid ?? "Payment",
@@ -180,10 +240,18 @@ export const fetchAdminDashboardData = async (): Promise<AdminDashboardData> => 
   }
 
   let pendingPayouts = 0;
+  let pendingPayoutsValue = 0;
   try {
-    pendingPayouts = await countQuery("paymentRequests", "status", "pending");
+    const pendingSnap = await getDocs(
+      query(collection(firestore, "paymentRequests"), where("status", "==", "pending")),
+    );
+    pendingPayouts = pendingSnap.size;
+    pendingSnap.docs.forEach((docSnap) => {
+      pendingPayoutsValue += paymentAmount(docSnap.data());
+    });
   } catch {
     pendingPayouts = 0;
+    pendingPayoutsValue = 0;
   }
 
   let recentUsers: AdminRecentUser[] = [];
@@ -198,7 +266,7 @@ export const fetchAdminDashboardData = async (): Promise<AdminDashboardData> => 
         name: data.name ?? data.displayName ?? "AfyaSmart User",
         email: data.email ?? "",
         plan: data.subscription_plan ?? "free",
-        subscribed: Boolean(data.is_subscribed),
+        subscribed: isActiveSubscription(data),
       };
     });
   } catch {
@@ -208,6 +276,8 @@ export const fetchAdminDashboardData = async (): Promise<AdminDashboardData> => 
   const recentTransactions = paidTransactions
     .sort((a, b) => b.time.localeCompare(a.time))
     .slice(0, 5);
+
+  const conversionRate = totalUsers > 0 ? Number(((activeUsers / totalUsers) * 100).toFixed(1)) : 0;
 
   return {
     metrics: {
@@ -220,9 +290,14 @@ export const fetchAdminDashboardData = async (): Promise<AdminDashboardData> => 
       totalFacilities: doctors + pharmacies,
       totalRevenue,
       pendingPayouts,
+      pendingPayoutsValue,
+      planCounts: { daily, weekly, monthly },
+      conversionRate,
     },
     recentUsers,
     recentTransactions,
+    weeklyRevenue,
+    weeklySubscribers,
   };
 };
 
@@ -234,6 +309,11 @@ export const fetchAllUsers = async (): Promise<AdminUser[]> => {
   );
   return snap.docs.map((d) => {
     const data = d.data();
+
+    const expiresDate = getDateValue(data.subscription_expires_at);
+    const isExpired = Boolean(expiresDate && expiresDate < new Date());
+    const isSubscribed = isActiveSubscription(data);
+
     return {
       id: d.id,
       name: data.name ?? data.displayName ?? "AfyaSmart User",
@@ -241,11 +321,12 @@ export const fetchAllUsers = async (): Promise<AdminUser[]> => {
       phone: data.phone ?? "",
       role: data.role ?? "user",
       subscriptionPlan: data.subscription_plan ?? "free",
-      isSubscribed: Boolean(data.is_subscribed),
+      isSubscribed,
       hasSubscribed: Boolean(data.has_subscribed),
       subscriptionExpiresAt: data.subscription_expires_at
         ? formatDate(data.subscription_expires_at)
         : null,
+      isExpired,
       onboardingCompleted: Boolean(data.onboarding_completed),
       createdAt: formatDate(data.created_at),
     };
@@ -259,10 +340,23 @@ export const updateAdminUser = async (
     role: string;
     is_subscribed: boolean;
     subscription_plan: string;
+    subscription_expires_at: string | null;
   }>,
 ) => {
+  const { subscription_expires_at, ...rest } = updates;
+  const normalizedUpdates = {
+    ...rest,
+    ...(subscription_expires_at !== undefined
+      ? {
+          subscription_expires_at: subscription_expires_at
+            ? Timestamp.fromDate(new Date(subscription_expires_at))
+            : null,
+        }
+      : {}),
+  };
+
   await updateDoc(doc(firestore, "users", userId), {
-    ...updates,
+    ...normalizedUpdates,
     updated_at: serverTimestamp(),
   });
 };
@@ -361,5 +455,68 @@ export const fetchAllPayments = async (): Promise<AdminPayment[]> => {
       createdAt: formatDate(data.created_at),
       paidAt: data.paid_at ? formatDate(data.paid_at) : null,
     };
+  });
+};
+
+export const reconcilePayment = async (
+  paymentId: string,
+  uid: string,
+  plan: string,
+) => {
+  const now = new Date();
+  let days = 0;
+  if (plan === "daily") days = 1;
+  else if (plan === "weekly") days = 7;
+  else if (plan === "monthly") days = 30;
+
+  let expiresAt: Timestamp | null = null;
+  if (uid && days > 0) {
+    let baseDate = now;
+    try {
+      const userDoc = await getDoc(doc(firestore, "users", uid));
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+        if (userData?.is_subscribed && userData?.subscription_expires_at) {
+          const currentExpiry =
+            typeof userData.subscription_expires_at.toDate === "function"
+              ? userData.subscription_expires_at.toDate()
+              : new Date(userData.subscription_expires_at);
+          if (!Number.isNaN(currentExpiry.getTime()) && currentExpiry > now) {
+            baseDate = currentExpiry; // Stack/accumulate time!
+          }
+        }
+      }
+    } catch (err) {
+      console.warn("Failed to check existing subscription for stacking:", err);
+    }
+    const expiryDate = new Date(baseDate.getTime() + days * 24 * 60 * 60 * 1000);
+    expiresAt = Timestamp.fromDate(expiryDate);
+  }
+
+  // 1. Update the payment request to paid
+  await updateDoc(doc(firestore, "paymentRequests", paymentId), {
+    paid: true,
+    status: "paid",
+    paid_at: serverTimestamp(),
+    updated_at: serverTimestamp(),
+  });
+
+  // 2. Activate user subscription
+  if (uid) {
+    await updateDoc(doc(firestore, "users", uid), {
+      is_subscribed: true,
+      has_subscribed: true,
+      subscription_plan: plan,
+      subscription_expires_at: expiresAt,
+      updated_at: serverTimestamp(),
+    });
+  }
+};
+
+export const rejectPayment = async (paymentId: string) => {
+  await updateDoc(doc(firestore, "paymentRequests", paymentId), {
+    paid: false,
+    status: "failed",
+    updated_at: serverTimestamp(),
   });
 };

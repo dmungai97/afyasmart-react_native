@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View, useWindowDimensions } from "react-native";
 
 const BORDER = "#E2E8F0";
 const TEXT_DARK = "#1E293B";
@@ -19,20 +19,24 @@ export interface MetricCardData {
 
 interface StatCardProps {
   item: MetricCardData;
+  style?: any;
 }
 
-export default function StatCard({ item }: StatCardProps) {
+export default function StatCard({ item, style }: StatCardProps) {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
+
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, isMobile && styles.cardMobile, style]}>
       <View style={styles.content}>
-        <Text style={styles.label}>{item.label}</Text>
-        <Text style={styles.value}>{item.value}</Text>
-        <Text style={[styles.subText, item.change ? styles.trend : null]}>
+        <Text style={[styles.label, isMobile && styles.labelMobile]}>{item.label}</Text>
+        <Text style={[styles.value, isMobile && styles.valueMobile]}>{item.value}</Text>
+        <Text style={[styles.subText, item.change ? styles.trend : null, isMobile && styles.subTextMobile]}>
           {item.change ? `+${item.change}` : item.sub}
         </Text>
       </View>
-      <View style={styles.iconWrap}>
-        <Ionicons name={item.icon} size={20} color="#475569" />
+      <View style={[styles.iconWrap, isMobile && styles.iconWrapMobile]}>
+        <Ionicons name={item.icon} size={isMobile ? 16 : 20} color="#475569" />
       </View>
     </View>
   );
@@ -90,5 +94,27 @@ const styles = StyleSheet.create({
     backgroundColor: "#F1F5F9",
     alignItems: "center",
     justifyContent: "center",
+  },
+  cardMobile: {
+    flexBasis: "48%",
+    flexGrow: 1,
+    minWidth: 0,
+    padding: 12,
+  },
+  labelMobile: {
+    fontSize: 10,
+  },
+  valueMobile: {
+    fontSize: 17,
+    marginTop: 2,
+     },
+  subTextMobile: {
+    fontSize: 9,
+    marginTop: 2,
+  },
+  iconWrapMobile: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
   },
 });

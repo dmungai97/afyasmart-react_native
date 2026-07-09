@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from "react-native";
 
 const SLATE_DARK = "#1E293B";
 const SLATE_MID = "#475569";
@@ -28,6 +28,8 @@ type IconName = keyof typeof Ionicons.glyphMap;
 
 export default function QuickActions() {
   const router = useRouter();
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
 
   const actionsList: [IconName, string, string, string][] = [
     ["add-circle-outline", STRINGS.addFacility, STRINGS.addFacilitySub, "/admin/facilities"],
@@ -39,27 +41,27 @@ export default function QuickActions() {
   ];
 
   return (
-    <View style={styles.quickActions}>
+    <View style={[styles.quickActions, isMobile && styles.quickActionsMobile]}>
       <View style={styles.quickHeader}>
         <View>
           <Text style={styles.panelTitle}>{STRINGS.quickActions}</Text>
           <Text style={styles.panelSub}>{STRINGS.meta}</Text>
         </View>
       </View>
-      <View style={styles.grid}>
+      <View style={[styles.grid, isMobile && styles.gridMobile]}>
         {actionsList.map(([icon, title, sub, route]) => (
           <TouchableOpacity
             key={title}
-            style={styles.actionCard}
+            style={[styles.actionCard, isMobile && styles.actionCardMobile]}
             onPress={() => router.push(route as any)}
             activeOpacity={0.7}
           >
-            <View style={styles.actionIcon}>
-              <Ionicons name={icon} size={18} color={SLATE_MID} />
+            <View style={[styles.actionIcon, isMobile && styles.actionIconMobile]}>
+              <Ionicons name={icon} size={isMobile ? 15 : 18} color={SLATE_MID} />
             </View>
             <View style={styles.textContainer}>
-              <Text style={styles.actionTitle}>{title}</Text>
-              <Text style={styles.actionSub}>{sub}</Text>
+              <Text style={[styles.actionTitle, isMobile && styles.actionTitleMobile]}>{title}</Text>
+              <Text style={[styles.actionSub, isMobile && styles.actionSubMobile]} numberOfLines={1}>{sub}</Text>
             </View>
             <Ionicons name="chevron-forward" size={14} color={SLATE_LIGHT} />
           </TouchableOpacity>
@@ -122,4 +124,31 @@ const styles = StyleSheet.create({
   textContainer: { flex: 1 },
   actionTitle: { color: SLATE_DARK, fontSize: 13, fontWeight: "600" },
   actionSub: { color: SLATE_LIGHT, fontSize: 11, marginTop: 2, fontWeight: "500" },
+  quickActionsMobile: {
+    padding: 14,
+    gap: 12,
+  },
+  gridMobile: {
+    gap: 8,
+  },
+  actionCardMobile: {
+    flexBasis: "100%",
+    flexGrow: 0,
+    width: "100%",
+    minHeight: 56,
+    padding: 10,
+    gap: 8,
+  },
+  actionIconMobile: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+  },
+  actionTitleMobile: {
+    fontSize: 11,
+  },
+  actionSubMobile: {
+    fontSize: 9,
+    marginTop: 1,
+  },
 });

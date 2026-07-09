@@ -2,16 +2,81 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    
+    // Core Helper Functions
     function isAdmin() {
       return request.auth != null
-        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role
-          in ["admin", "super_admin"];
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ["admin", "super_admin"];
     }
 
+    function isOwnUser(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    function hasActiveSubscription() {
+      return request.auth != null
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.is_subscribed == true
+        && (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.subscription_expires_at == null
+          || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.subscription_expires_at > request.time);
+    }
+
+    // Safety Validation Functions
+    function isSafeUserCreate(userId) {
+      return isOwnUser(userId)
+        && request.resource.data.keys().hasOnly([
+          "id",
+          "name",
+          "email",
+          "phone",
+          "role",
+          "is_subscribed",
+          "has_subscribed",
+          "onboarding_completed",
+          "subscription_plan",
+          "chat_count",
+          "subscription_expires_at",
+          "created_at",
+          "updated_at"
+        ])
+        && request.resource.data.id == userId
+        && request.resource.data.role == "user"
+        && request.resource.data.is_subscribed == false
+        && request.resource.data.has_subscribed == false
+        && request.resource.data.subscription_plan == "free"
+        && request.resource.data.chat_count == 0
+        && request.resource.data.subscription_expires_at == null;
+    }
+
+    function isSafeUserUpdate(userId) {
+      let changed = request.resource.data.diff(resource.data).affectedKeys();
+      return isOwnUser(userId)
+        && changed.hasOnly([
+          "name",
+          "phone",
+          "onboarding_completed",
+          "chat_count",
+          "is_subscribed",
+          "has_subscribed",
+          "subscription_plan",
+          "subscription_expires_at",
+          "updated_at"
+        ])
+        && (!changed.hasAny(["onboarding_completed"])
+          || request.resource.data.onboarding_completed == true)
+        && (!changed.hasAny(["chat_count"])
+          || request.resource.data.chat_count >= 0);
+    }
+
+    // --- Collections ---
+
     match /users/{userId} {
-      allow read: if request.auth != null && (request.auth.uid == userId || isAdmin());
-      allow update: if request.auth != null && (request.auth.uid == userId || isAdmin());
-      allow create: if request.auth != null && request.auth.uid == userId;
+      // Fixed recursion: Evaluate isAdmin() ONLY if the user is not reading their own document
+      allow read: if request.auth != null && (request.auth.uid == userId || (!isOwnUser(userId) && isAdmin()));
+      
+      // Fixed recursion & fixed syntax parentheses layout
+      allow update: if isSafeUserUpdate(userId) || (!isOwnUser(userId) && isAdmin());
+      allow create: if isSafeUserCreate(userId) || (!isOwnUser(userId) && isAdmin());
+      
       allow list: if isAdmin();
 
       match /chatMessages/{messageId} {
@@ -25,29 +90,25 @@ service cloud.firestore {
     }
 
     match /doctors/{doctorId} {
-      allow read: if request.auth != null;
+      allow read: if hasActiveSubscription() || isAdmin();
       allow create, update, delete: if isAdmin();
     }
 
     match /drugs/{drugId} {
-      allow read: if request.auth != null;
+      allow read: if hasActiveSubscription() || isAdmin();
       allow create, update, delete: if isAdmin();
     }
 
     match /pharmacies/{pharmacyId} {
-      allow read: if request.auth != null;
+      allow read: if hasActiveSubscription() || isAdmin();
       allow create, update, delete: if isAdmin();
     }
 
     match /paymentRequests/{checkoutRequestId} {
       allow read: if request.auth != null && (resource.data.uid == request.auth.uid || isAdmin());
       allow list: if isAdmin();
-      allow create: if request.auth != null
-        && request.resource.data.uid == request.auth.uid;
-      allow update: if (request.auth != null
-        && resource.data.uid == request.auth.uid
-        && request.resource.data.uid == resource.data.uid)
-        || isAdmin();
+      allow create: if isAdmin() || (request.auth != null && request.resource.data.uid == request.auth.uid);
+      allow update: if isAdmin() || (request.auth != null && resource.data.uid == request.auth.uid);
       allow delete: if false;
     }
   }

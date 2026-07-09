@@ -15,6 +15,7 @@ interface FacilitiesOverviewProps {
   totalUsers: number;
   drugs: number;
   subscriptions: number;
+  isMobile?: boolean;
 }
 
 const formatNumber = (value: number) =>
@@ -27,14 +28,15 @@ export default function FacilitiesOverview({
   totalUsers,
   drugs,
   subscriptions,
+  isMobile = false,
 }: FacilitiesOverviewProps) {
   return (
     <>
       {/* Facilities Donut Chart panel */}
-      <View style={[styles.panel, styles.facilitiesPanel]}>
+      <View style={[styles.panel, styles.facilitiesPanel, isMobile && styles.mobilePanel]}>
         <Text style={styles.panelTitle}>Facilities Distribution</Text>
         <Text style={styles.panelSub}>Provider networks registered</Text>
-        <View style={styles.donutWrap}>
+        <View style={[styles.donutWrap, isMobile && styles.donutWrapMobile]}>
           <View style={styles.donutContainer}>
             <View style={styles.donut}>
               <Text style={styles.donutValue}>{formatNumber(totalFacilities)}</Text>
@@ -65,7 +67,7 @@ export default function FacilitiesOverview({
       </View>
 
       {/* Facility Status list panel */}
-      <View style={[styles.panel, styles.statusPanel]}>
+      <View style={[styles.panel, styles.statusPanel, isMobile && styles.mobilePanel]}>
         <Text style={styles.panelTitle}>Platform Status</Text>
         <Text style={styles.panelSub}>Active system telemetry</Text>
         <View style={styles.statusList}>
@@ -170,4 +172,15 @@ const styles = StyleSheet.create({
   },
   statusLabel: { color: SLATE_DARK, fontSize: 13, fontWeight: "500", flex: 1 },
   statusValue: { color: SLATE_MID, fontSize: 13, fontWeight: "600" },
+  mobilePanel: {
+    flexBasis: "100%",
+    flexGrow: 0,
+    width: "100%",
+    padding: 12,
+  },
+  donutWrapMobile: {
+    flexDirection: "column",
+    alignItems: "center",
+    gap: 12,
+  },
 });

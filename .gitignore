@@ -33,7 +33,9 @@ expo-admin*.log
 *.pem
 
 # local env files
+.env
 .env*.local
+functions/.env
 
 # typescript
 *.tsbuildinfo

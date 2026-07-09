@@ -6,17 +6,18 @@ import {
   limit,
   onSnapshot,
   getCountFromServer,
+  getDocs,
   where,
 } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
-import { firestore, firebaseAuth } from "../src/services/firebase";
+import { firestore, firebaseAuth } from "@/src/services/firebase";
 import {
   AdminDashboardData,
   AdminMetric,
   AdminRecentUser,
   AdminTransaction,
-} from "../src/services/admin.service";
-import { useAuthStore } from "../src/store/authStore";
+} from "@admin/services/admin.service";
+import { useAuthStore } from "@/src/store/authStore";
 
 const planAmounts: Record<string, number> = {
   daily: 20,
@@ -52,6 +53,23 @@ const formatDate = (value: any) => {
   }).format(date);
 };
 
+const getDateValue = (value: any) => {
+  if (!value) return null;
+  const date =
+    typeof value.toDate === "function"
+      ? value.toDate()
+      : new Date(value);
+
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
+const isActiveSubscription = (data: any) => {
+  if (!data?.is_subscribed) return false;
+
+  const expiresAt = getDateValue(data.subscription_expires_at);
+  return !expiresAt || expiresAt > new Date();
+};
+
 export const useAdminDashboard = () => {
   const token = useAuthStore((s) => s.token);
   const [dashboard, setDashboard] = useState<AdminDashboardData>({
@@ -65,6 +83,9 @@ export const useAdminDashboard = () => {
       totalFacilities: 0,
       totalRevenue: 0,
       pendingPayouts: 0,
+      pendingPayoutsValue: 0,
+      planCounts: { daily: 0, weekly: 0, monthly: 0 },
+      conversionRate: 0,
     },
     recentUsers: [],
     recentTransactions: [],
@@ -74,7 +95,6 @@ export const useAdminDashboard = () => {
   const initialLoadDone = useRef(false);
 
   useEffect(() => {
-    console.log("[useAdminDashboard] Hook mounted. Zustand token exists:", !!token);
     if (!token) {
       setLoading(false);
       return;
@@ -96,8 +116,6 @@ export const useAdminDashboard = () => {
 
     // Listen to Firebase Auth state change to ensure requests are authorized
     const unsubAuth = onAuthStateChanged(firebaseAuth, (firebaseUser) => {
-      console.log("[useAdminDashboard] Auth state changed. SDK User:", firebaseUser ? firebaseUser.email : "null");
-      
       // Clean up existing listeners on auth change
       if (unsubPayments) {
         unsubPayments();
@@ -125,34 +143,54 @@ export const useAdminDashboard = () => {
         try {
           const [
             totalUsers,
-            activeUsers,
+            activeUsersSnap,
             subscriptions,
             doctors,
             pharmacies,
             drugs,
           ] = await Promise.all([
             getCountFromServer(collection(firestore, "users")),
-            getCountFromServer(query(collection(firestore, "users"), where("is_subscribed", "==", true))),
+            getDocs(query(collection(firestore, "users"), where("is_subscribed", "==", true))),
             getCountFromServer(query(collection(firestore, "users"), where("has_subscribed", "==", true))),
             getCountFromServer(collection(firestore, "doctors")),
             getCountFromServer(collection(firestore, "pharmacies")),
             getCountFromServer(collection(firestore, "drugs")),
           ]);
 
+          let daily = 0;
+          let weekly = 0;
+          let monthly = 0;
+          const activeUsers = activeUsersSnap.docs.filter((item) => {
+            const data = item.data();
+            const active = isActiveSubscription(data);
+            if (active) {
+              const plan = data.subscription_plan;
+              if (plan === "daily") daily++;
+              else if (plan === "weekly") weekly++;
+              else if (plan === "monthly") monthly++;
+            }
+            return active;
+          }).length;
+
           if (active) {
-            setDashboard((prev) => ({
-              ...prev,
-              metrics: {
-                ...prev.metrics,
-                totalUsers: totalUsers.data().count,
-                activeUsers: activeUsers.data().count,
-                subscriptions: subscriptions.data().count,
-                doctors: doctors.data().count,
-                pharmacies: pharmacies.data().count,
-                drugs: drugs.data().count,
-                totalFacilities: doctors.data().count + pharmacies.data().count,
-              },
-            }));
+            setDashboard((prev) => {
+              const tUsers = totalUsers.data().count;
+              return {
+                ...prev,
+                metrics: {
+                  ...prev.metrics,
+                  totalUsers: tUsers,
+                  activeUsers,
+                  subscriptions: subscriptions.data().count,
+                  doctors: doctors.data().count,
+                  pharmacies: pharmacies.data().count,
+                  drugs: drugs.data().count,
+                  totalFacilities: doctors.data().count + pharmacies.data().count,
+                  planCounts: { daily, weekly, monthly },
+                  conversionRate: tUsers > 0 ? Number(((activeUsers / tUsers) * 100).toFixed(1)) : 0,
+                },
+              };
+            });
             aggregatesLoaded = true;
             checkLoadingState();
           }
@@ -179,12 +217,24 @@ export const useAdminDashboard = () => {
         (snapshot) => {
           let totalRevenue = 0;
           let pendingPayouts = 0;
+          let pendingPayoutsValue = 0;
           const paidTransactions: AdminTransaction[] = [];
+
+          // Calculate start of current week (Monday)
+          const now = new Date();
+          const day = now.getDay();
+          const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+          const startOfWeek = new Date(now.setDate(diff));
+          startOfWeek.setHours(0, 0, 0, 0);
+
+          const weeklyRevenue = [0, 0, 0, 0, 0, 0, 0];
+          const weeklySubscribers = [0, 0, 0, 0, 0, 0, 0];
 
           snapshot.docs.forEach((docSnap) => {
             const data = docSnap.data();
             if (data.status === "pending") {
               pendingPayouts++;
+              pendingPayoutsValue += paymentAmount(data);
             }
             if (data.paid === true) {
               const amount = paymentAmount(data);
@@ -197,6 +247,17 @@ export const useAdminDashboard = () => {
                 status: data.status ?? "paid",
                 time: formatDate(data.paid_at ?? data.updated_at ?? data.created_at),
               });
+
+              // Group by day of the current week
+              const dateVal = data.paid_at ?? data.created_at;
+              const date = dateVal?.toDate ? dateVal.toDate() : new Date(dateVal);
+              if (!Number.isNaN(date.getTime()) && date >= startOfWeek) {
+                const dayIndex = date.getDay() === 0 ? 6 : date.getDay() - 1;
+                if (dayIndex >= 0 && dayIndex < 7) {
+                  weeklyRevenue[dayIndex] += amount;
+                  weeklySubscribers[dayIndex] += 1;
+                }
+              }
             }
           });
 
@@ -207,8 +268,11 @@ export const useAdminDashboard = () => {
                 ...prev.metrics,
                 totalRevenue,
                 pendingPayouts,
+                pendingPayoutsValue,
               },
               recentTransactions: paidTransactions.slice(0, 5),
+              weeklyRevenue,
+              weeklySubscribers,
             }));
             paymentsLoaded = true;
             checkLoadingState();
@@ -247,7 +311,7 @@ export const useAdminDashboard = () => {
               name: data.name ?? data.displayName ?? "AfyaSmart User",
               email: data.email ?? "",
               plan: data.subscription_plan ?? "free",
-              subscribed: Boolean(data.is_subscribed),
+              subscribed: isActiveSubscription(data),
             };
           });
 

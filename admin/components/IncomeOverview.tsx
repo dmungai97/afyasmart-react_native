@@ -12,6 +12,9 @@ interface IncomeOverviewProps {
   subscriptions: number;
   totalUsers: number;
   drugs: number;
+  weeklyRevenue?: number[];
+  weeklySubscribers?: number[];
+  isMobile?: boolean;
 }
 
 const formatNumber = (value: number) =>
@@ -35,11 +38,40 @@ export default function IncomeOverview({
   subscriptions,
   totalUsers,
   drugs,
+  weeklyRevenue = [0, 0, 0, 0, 0, 0, 0],
+  weeklySubscribers = [0, 0, 0, 0, 0, 0, 0],
+  isMobile = false,
 }: IncomeOverviewProps) {
   const [activeTab, setActiveTab] = useState<"earnings" | "reports">("reports");
+  const [selectedDayIndex, setSelectedDayIndex] = useState<number | null>(null);
+
+  // Find max values to scale the bar heights dynamically
+  const maxRevenue = Math.max(...weeklyRevenue, 0);
+  const maxSubscribers = Math.max(...weeklySubscribers, 0);
+
+  const getBarHeights = (index: number) => {
+    const rev = weeklyRevenue[index] ?? 0;
+    const sub = weeklySubscribers[index] ?? 0;
+
+    // Max height in chart track is 110px
+    const revHeight = maxRevenue > 0 ? (rev / maxRevenue) * 110 : 0;
+    const subHeight = maxSubscribers > 0 ? (sub / maxSubscribers) * 110 : 0;
+
+    // Return a minimum height of 4px for zero values to make it look clean
+    return {
+      revHeight: Math.max(revHeight, rev > 0 ? 12 : 4),
+      subHeight: Math.max(subHeight, sub > 0 ? 12 : 4),
+    };
+  };
+
+  const periodText = selectedDayIndex !== null
+    ? `${DAYS[selectedDayIndex]}: ${formatMoney(weeklyRevenue[selectedDayIndex] ?? 0)} • ${formatNumber(weeklySubscribers[selectedDayIndex] ?? 0)} Subscribers`
+    : isMobile
+      ? "Tap bars for details"
+      : "Your report during this period (tap bars for details)";
 
   return (
-    <View style={[styles.panel, styles.incomePanel]}>
+    <View style={[styles.panel, styles.incomePanel, isMobile && styles.mobilePanel]}>
       {/* iOS Style Segmented Tabs */}
       <View style={styles.tabBar}>
         <TouchableOpacity
@@ -47,18 +79,18 @@ export default function IncomeOverview({
           onPress={() => setActiveTab("earnings")}
           activeOpacity={0.7}
         >
-          <Text style={[styles.tabText, activeTab === "earnings" && styles.tabTextActive]}>My earnings</Text>
+          <Text style={[styles.tabText, isMobile && styles.mobileTabText, activeTab === "earnings" && styles.tabTextActive]}>My earnings</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.tab, activeTab === "reports" && styles.tabActive]}
           onPress={() => setActiveTab("reports")}
           activeOpacity={0.7}
         >
-          <Text style={[styles.tabText, activeTab === "reports" && styles.tabTextActive]}>My reports</Text>
+          <Text style={[styles.tabText, isMobile && styles.mobileTabText, activeTab === "reports" && styles.tabTextActive]}>My reports</Text>
         </TouchableOpacity>
       </View>
 
-      <Text style={styles.periodText}>Your report during this period</Text>
+      <Text style={[styles.periodText, isMobile && styles.mobilePeriodText]} numberOfLines={2}>{periodText}</Text>
 
       {/* Chart container with absolute dotted background gridlines */}
       <View style={styles.chartContainer}>
@@ -68,48 +100,52 @@ export default function IncomeOverview({
           ))}
         </View>
         <View style={styles.chart}>
-          {[28, 72, 58, 64, 110, 76, 94].map((height, index) => (
-            <View key={index} style={styles.chartColumn}>
-              <View style={styles.barTrack}>
-                <View style={styles.barGroup}>
-                  <View style={[styles.bar, { height, backgroundColor: SLATE_DARK }]} />
-                  <View
-                    style={[
-                      styles.bar,
-                      { height: Math.max(12, height * 0.58), backgroundColor: SLATE_LIGHT },
-                    ]}
-                  />
+          {DAYS.map((day, index) => {
+            const { revHeight, subHeight } = getBarHeights(index);
+            const isSelected = selectedDayIndex === index;
+            return (
+              <TouchableOpacity
+                key={day}
+                style={styles.chartColumn}
+                activeOpacity={0.8}
+                onPress={() => setSelectedDayIndex(isSelected ? null : index)}
+              >
+                <View style={[styles.barTrack, isSelected && styles.barTrackSelected, isMobile && styles.mobileBarTrack]}>
+                  <View style={[styles.barGroup, isMobile && styles.mobileBarGroup]}>
+                    <View style={[styles.bar, isMobile && styles.mobileBar, { height: revHeight, backgroundColor: isSelected ? "#2563EB" : ACCENT_BLUE }]} />
+                    <View style={[styles.bar, isMobile && styles.mobileBar, { height: subHeight, backgroundColor: isSelected ? "#059669" : "#10B981" }]} />
+                  </View>
                 </View>
-              </View>
-              <Text style={styles.dayLabel}>{DAYS[index]}</Text>
-            </View>
-          ))}
+                <Text style={[styles.dayLabel, isSelected && styles.dayLabelSelected]}>{day}</Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
       </View>
 
-      <View style={styles.chartFooter}>
-        <View style={styles.metricBlock}>
+      <View style={[styles.chartFooter, isMobile && { gap: 8 }]}>
+        <View style={[styles.metricBlock, isMobile && styles.mobileMetricBlock]}>
           <View style={styles.metricTitleRow}>
-            <View style={[styles.legendDot, { backgroundColor: SLATE_DARK }]} />
+            <View style={[styles.legendDot, { backgroundColor: ACCENT_BLUE }]} />
             <Text style={styles.footerLabel}>{STRINGS.totalRevenue}</Text>
           </View>
           <Text style={styles.footerValue}>{formatMoney(totalRevenue)}</Text>
         </View>
-        <View style={styles.metricBlock}>
+        <View style={[styles.metricBlock, isMobile && styles.mobileMetricBlock]}>
           <View style={styles.metricTitleRow}>
-            <View style={[styles.legendDot, { backgroundColor: SLATE_MID }]} />
+            <View style={[styles.legendDot, { backgroundColor: "#10B981" }]} />
             <Text style={styles.footerLabel}>{STRINGS.subscribers}</Text>
           </View>
           <Text style={styles.footerValue}>{formatNumber(subscriptions)}</Text>
         </View>
-        <View style={styles.metricBlock}>
+        <View style={[styles.metricBlock, isMobile && styles.mobileMetricBlock]}>
           <View style={styles.metricTitleRow}>
             <View style={[styles.legendDot, { backgroundColor: SLATE_LIGHT }]} />
             <Text style={styles.footerLabel}>{STRINGS.totalUsers}</Text>
           </View>
           <Text style={styles.footerValue}>{formatNumber(totalUsers)}</Text>
         </View>
-        <View style={styles.metricBlock}>
+        <View style={[styles.metricBlock, isMobile && styles.mobileMetricBlock]}>
           <View style={styles.metricTitleRow}>
             <View style={[styles.legendDot, { backgroundColor: "#CBD5E1" }]} />
             <Text style={styles.footerLabel}>{STRINGS.drugRecords}</Text>
@@ -200,20 +236,28 @@ const styles = StyleSheet.create({
   },
   barTrack: {
     height: 130,
-    width: 24,
+    width: 28,
     backgroundColor: "transparent",
-    borderRadius: 4,
+    borderRadius: 6,
     justifyContent: "flex-end",
     alignItems: "center",
     overflow: "hidden",
+    paddingBottom: 2,
   },
-  barGroup: { flexDirection: "row", alignItems: "flex-end", gap: 2 },
-  bar: { width: 6, borderRadius: 2 },
+  barTrackSelected: {
+    backgroundColor: "rgba(59, 130, 246, 0.08)",
+  },
+  barGroup: { flexDirection: "row", alignItems: "flex-end", gap: 3 },
+  bar: { width: 6, borderRadius: 3 },
   dayLabel: {
     color: SLATE_LIGHT,
     fontSize: 10,
     marginTop: 6,
     fontWeight: "600",
+  },
+  dayLabelSelected: {
+    color: "#1E293B",
+    fontWeight: "700",
   },
   chartFooter: {
     flexDirection: "row",
@@ -250,5 +294,33 @@ const styles = StyleSheet.create({
     color: SLATE_MID,
     fontSize: 10,
     fontWeight: "600",
+  },
+  mobilePanel: {
+    flexBasis: "100%",
+    flexGrow: 0,
+    width: "100%",
+    padding: 12,
+  },
+  mobileMetricBlock: {
+    flexBasis: "48%",
+    flexGrow: 1,
+    minWidth: 0,
+    padding: 8,
+  },
+  mobileBarTrack: {
+    width: 22,
+  },
+  mobileBarGroup: {
+    gap: 1.5,
+  },
+  mobileBar: {
+    width: 5,
+  },
+  mobileTabText: {
+    fontSize: 12,
+  },
+  mobilePeriodText: {
+    fontSize: 11,
+    marginBottom: 10,
   },
 });
