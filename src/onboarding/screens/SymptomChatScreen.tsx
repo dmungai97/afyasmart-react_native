@@ -2,12 +2,13 @@ import { useState, useRef, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   StatusBar, ScrollView, KeyboardAvoidingView, Platform,
-  Animated, ActivityIndicator, Keyboard,
+  Animated, ActivityIndicator, Keyboard, Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { buildDiagnosisFromSymptoms, useDiagnosisStore } from '@/src/store/diagnosisStore';
+import { useDiagnosisStore } from '@/src/store/diagnosisStore';
+import { requestSymptomsAnalysis } from '@/src/services/symptoms.service';
 
 const TEAL      = '#0B6E6E';
 const TEAL_DARK = '#063D3D';
@@ -94,20 +95,44 @@ export function SymptomChatScreen() {
     const text = input.trim();
     if (!text || loading) return;
 
-    const diagnosis = buildDiagnosisFromSymptoms(text);
-    const topCondition = diagnosis.conditions[0]?.name ?? 'a possible health concern';
-
     setInput('');
     setHasSymptoms(true);
-    setPendingDiagnosis(diagnosis);
-
     setMessages((prev) => [...prev, { role: 'user', text }]);
 
     setLoading(true);
     startDots();
     setMessages((prev) => [...prev, { role: 'assistant', text: '', typing: true }]);
 
-    setTimeout(() => {
+    try {
+      const data = await requestSymptomsAnalysis({
+        symptoms: [text],
+        age: 25,
+        gender: 'other',
+        duration: '1-3 days',
+        severity: 'Moderate',
+        answers: {},
+      });
+
+      const formattedDiagnosis = {
+        symptoms: text,
+        summary: data.urgency_desc,
+        urgency: data.urgency,
+        conditions: data.conditions.map(c => ({
+          name: c.name,
+          probability: c.percent,
+          level: c.likelihood,
+          color: c.color,
+        })),
+        medications: data.medications.map(m => ({
+          name: m.name,
+          note: m.desc,
+        })),
+        preparedAt: new Date().toISOString(),
+      };
+
+      setPendingDiagnosis(formattedDiagnosis);
+      const topCondition = formattedDiagnosis.conditions[0]?.name ?? 'a possible health concern';
+
       setMessages((prev) => {
         const without = prev.filter((m) => !m.typing);
         return [...without, {
@@ -124,7 +149,15 @@ export function SymptomChatScreen() {
       setTimeout(() => {
         router.push('/(onboarding)/analysis-loading' as any);
       }, 1200);
-    }, 2200);
+    } catch (err: any) {
+      stopDots();
+      setLoading(false);
+      setMessages((prev) => prev.filter((m) => !m.typing));
+      Alert.alert(
+        "Analysis Limited",
+        err?.message ?? "An error occurred while analyzing symptoms. Please try again."
+      );
+    }
   };
 
   const inputBottomPadding = keyboardShown ? 12 : Math.max(insets.bottom, 8) + 12;

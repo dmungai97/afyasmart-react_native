@@ -4,16 +4,14 @@ import { doc, serverTimestamp, setDoc } from "firebase/firestore";
 import { firebaseAuth, firestore } from "./firebase";
 import { subscribeUser } from "./subscription.service";
 
-type FirebaseExtra = {
-  mpesaApiBaseUrl?: string;
-};
+const USE_FIREBASE_FUNCTIONS = process.env.EXPO_PUBLIC_USE_FIREBASE_FUNCTIONS === "true";
 
+type FirebaseExtra = { mpesaApiBaseUrl?: string; functionsBaseUrl?: string };
 const extra = (Constants.expoConfig?.extra?.firebase ?? {}) as FirebaseExtra;
 
-const mpesaApiBaseUrl =
-  process.env.EXPO_PUBLIC_MPESA_API_BASE_URL ??
-  extra.mpesaApiBaseUrl ??
-  "https://afyasmart-ey9q.onrender.com/api/v1";
+const mpesaApiBaseUrl = USE_FIREBASE_FUNCTIONS
+  ? (process.env.EXPO_PUBLIC_FUNCTIONS_BASE_URL ?? extra.functionsBaseUrl ?? "https://us-central1-afya-smart-377ad.cloudfunctions.net")
+  : (process.env.EXPO_PUBLIC_MPESA_API_BASE_URL ?? extra.mpesaApiBaseUrl ?? "https://afyasmart-ey9q.onrender.com/api/v1");
 
 const checkoutPlans = new Map<string, string>();
 const lastCheckoutKey = "mpesa_last_checkout_request_id";
@@ -50,7 +48,14 @@ const requestLaravelMpesa = async <T>(
   token: string | null,
 ): Promise<T> => {
   const idToken = token ?? (await firebaseAuth.currentUser?.getIdToken());
-  const response = await fetch(`${mpesaApiBaseUrl}${path}`, {
+
+  let resolvedPath = path;
+  if (USE_FIREBASE_FUNCTIONS) {
+    if (path === "/mpesa/initiate") resolvedPath = "/mpesaInitiate";
+    else if (path === "/mpesa/status") resolvedPath = "/mpesaStatus";
+  }
+
+  const response = await fetch(`${mpesaApiBaseUrl}${resolvedPath}`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

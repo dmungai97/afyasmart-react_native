@@ -6,6 +6,9 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { requestSymptomsAnalysis } from '@/src/services/symptoms.service';
+import { useAuthStore } from '@/src/store/authStore';
+import { isSubscriptionActive } from '@/src/services/subscription.model';
+import { useDiagnosisStore } from '@/src/store/diagnosisStore';
 
 const TEAL   = '#0B6E6E';
 const GREEN  = '#16A34A';
@@ -32,6 +35,9 @@ const SEVERITY_LABELS  = ['Mild', 'Moderate', 'Severe'];
 
 export function SymptomsScreen() {
   const router = useRouter();
+  const user = useAuthStore(state => state.user);
+  const isSubscribed = isSubscriptionActive(user);
+  const setPendingDiagnosis = useDiagnosisStore(s => s.setPendingDiagnosis);
 
   const [step, setStep]               = useState<Step>('entry');
   const [selectedSymptoms, setSelectedSymptoms] = useState<string[]>([]);
@@ -98,6 +104,25 @@ export function SymptomsScreen() {
         level: data.urgency,
         desc: data.urgency_desc,
       });
+
+      // Format and store in the diagnosis store so it persists if they upgrade/subscribe later
+      const formattedDiagnosis = {
+        symptoms: selectedSymptoms.join(', '),
+        summary: data.urgency_desc,
+        urgency: data.urgency,
+        conditions: data.conditions.map(c => ({
+          name: c.name,
+          probability: c.percent,
+          level: c.likelihood,
+          color: c.color,
+        })),
+        medications: data.medications.map(m => ({
+          name: m.name,
+          note: m.desc,
+        })),
+        preparedAt: new Date().toISOString(),
+      };
+      setPendingDiagnosis(formattedDiagnosis);
 
       setTimeout(() => {
         setStep('results');
@@ -592,50 +617,69 @@ export function SymptomsScreen() {
               <Ionicons name="information-circle-outline" size={16} color="#888" />
             </View>
 
-            <View style={styles.conditionRow}>
-              <View style={[styles.conditionDot, { backgroundColor: results[0]?.color ?? RED }]} />
-              <View style={styles.conditionInfo}>
-                <Text style={styles.conditionName}>{results[0]?.name ?? 'Condition 1'}</Text>
-                <Text style={styles.conditionLikelihood}>{results[0]?.likelihood} likelihood</Text>
-              </View>
-              <Text style={[styles.conditionPercent, { color: results[0]?.color ?? RED }]}>
-                {results[0]?.percent}%
-              </Text>
-            </View>
-
-            {[1, 2].map((i) => (
-              <View key={i} style={styles.conditionRowLocked}>
-                <View style={styles.conditionDotLocked} />
-                <View style={styles.conditionInfoLocked}>
-                  <View style={styles.lockedBar} />
-                  <View style={[styles.lockedBar, { width: 80 }]} />
+            {isSubscribed ? (
+              results.map((cond, i) => (
+                <View key={i} style={[styles.conditionRow, i > 0 && { borderTopWidth: 0.5, borderTopColor: '#F3F4F6' }]}>
+                  <View style={[styles.conditionDot, { backgroundColor: cond.color ?? RED }]} />
+                  <View style={styles.conditionInfo}>
+                    <Text style={styles.conditionName}>{cond.name}</Text>
+                    <Text style={styles.conditionLikelihood}>{cond.likelihood} likelihood</Text>
+                  </View>
+                  <Text style={[styles.conditionPercent, { color: cond.color ?? RED }]}>
+                    {cond.percent}%
+                  </Text>
                 </View>
-                <Ionicons name="lock-closed" size={18} color="#ccc" />
-              </View>
-            ))}
+              ))
+            ) : (
+              <>
+                {results[0] && (
+                  <View style={styles.conditionRow}>
+                    <View style={[styles.conditionDot, { backgroundColor: results[0].color ?? RED }]} />
+                    <View style={styles.conditionInfo}>
+                      <Text style={styles.conditionName}>{results[0].name}</Text>
+                      <Text style={styles.conditionLikelihood}>{results[0].likelihood} likelihood</Text>
+                    </View>
+                    <Text style={[styles.conditionPercent, { color: results[0].color ?? RED }]}>
+                      {results[0].percent}%
+                    </Text>
+                  </View>
+                )}
 
-            <TouchableOpacity
-              style={styles.unlockCta}
-              onPress={() => router.push('/(tabs)/subscription' as any)}
-              activeOpacity={0.85}
-            >
-              <Ionicons name="lock-open-outline" size={16} color="#fff" />
-              <Text style={styles.unlockCtaText}>Unlock Full Results</Text>
-            </TouchableOpacity>
+                {[1, 2].map((i) => (
+                  <View key={i} style={styles.conditionRowLocked}>
+                    <View style={styles.conditionDotLocked} />
+                    <View style={styles.conditionInfoLocked}>
+                      <View style={styles.lockedBar} />
+                      <View style={[styles.lockedBar, { width: 80 }]} />
+                    </View>
+                    <Ionicons name="lock-closed" size={18} color="#ccc" />
+                  </View>
+                ))}
 
-            <View style={styles.unlockTeaser}>
-              {[
-                'Detailed condition analysis',
-                'Recommended medication',
-                'Nearby doctors & pharmacies',
-                'AI follow-up chat',
-              ].map((t, i) => (
-                <View key={i} style={styles.teaserRow}>
-                  <Ionicons name="checkmark-circle" size={14} color={GREEN} />
-                  <Text style={styles.teaserText}>{t}</Text>
+                <TouchableOpacity
+                  style={styles.unlockCta}
+                  onPress={() => router.push('/(tabs)/subscription' as any)}
+                  activeOpacity={0.85}
+                >
+                  <Ionicons name="lock-open-outline" size={16} color="#fff" />
+                  <Text style={styles.unlockCtaText}>Unlock Full Results</Text>
+                </TouchableOpacity>
+
+                <View style={styles.unlockTeaser}>
+                  {[
+                    'Detailed condition analysis',
+                    'Recommended medication',
+                    'Nearby doctors & pharmacies',
+                    'AI follow-up chat',
+                  ].map((t, i) => (
+                    <View key={i} style={styles.teaserRow}>
+                      <Ionicons name="checkmark-circle" size={14} color={GREEN} />
+                      <Text style={styles.teaserText}>{t}</Text>
+                    </View>
+                  ))}
                 </View>
-              ))}
-            </View>
+              </>
+            )}
           </View>
 
           <View style={styles.actionCard}>
@@ -669,53 +713,97 @@ export function SymptomsScreen() {
               <Ionicons name="information-circle-outline" size={16} color="#888" />
             </View>
             <Text style={styles.medsSub}>Commonly used for these symptoms</Text>
-            {medications.map((m, i) => (
-              <View key={i} style={styles.medRow}>
-                <Text style={styles.medIcon}>{m.icon || '💊'}</Text>
-                <View style={styles.medInfo}>
-                  <Text style={styles.medName}>{m.name}</Text>
-                  <Text style={styles.medDesc}>{m.desc}</Text>
+            
+            {isSubscribed ? (
+              medications.map((m, i) => (
+                <View key={i} style={styles.medRow}>
+                  <Text style={styles.medIcon}>{m.icon || '💊'}</Text>
+                  <View style={styles.medInfo}>
+                    <Text style={styles.medName}>{m.name}</Text>
+                    <Text style={styles.medDesc}>{m.desc}</Text>
+                  </View>
                 </View>
+              ))
+            ) : (
+              <View style={styles.lockedSectionPlaceholder}>
+                <Ionicons name="lock-closed" size={24} color={TEAL} style={{ marginBottom: 6 }} />
+                <Text style={styles.lockedSectionTitle}>Suggested Medication Locked</Text>
+                <Text style={styles.lockedSectionText}>Subscribe to premium to view recommended treatments and dosages.</Text>
+                <TouchableOpacity
+                  style={styles.lockedSectionBtn}
+                  onPress={() => router.push('/(tabs)/subscription' as any)}
+                >
+                  <Text style={styles.lockedSectionBtnText}>Unlock with Premium</Text>
+                </TouchableOpacity>
               </View>
-            ))}
-            <TouchableOpacity style={styles.viewAllMeds}>
-              <Text style={styles.viewAllMedsText}>View all medications</Text>
-            </TouchableOpacity>
+            )}
+
+            {isSubscribed && (
+              <TouchableOpacity style={styles.viewAllMeds}>
+                <Text style={styles.viewAllMedsText}>View all medications</Text>
+              </TouchableOpacity>
+            )}
           </View>
 
           <View style={styles.nearbyCard}>
             <Text style={styles.nearbyTitle}>Need help nearby?</Text>
             <Text style={styles.nearbySub}>Find healthcare services near you</Text>
-            {[
-              { label: 'Nearby Pharmacies', desc: 'Find medicines near you',        icon: 'medkit-outline'   },
-              { label: 'Nearby Doctors',    desc: 'Book a consultation',            icon: 'people-outline'   },
-              { label: 'Nearby Hospitals',  desc: 'Emergency care centers',         icon: 'business-outline' },
-            ].map((n, i) => (
-              <TouchableOpacity key={i} style={styles.nearbyRow}>
-                <View style={styles.nearbyIcon}>
-                  <Ionicons name={n.icon as any} size={20} color={TEAL} />
-                </View>
-                <View style={styles.nearbyInfo}>
-                  <Text style={styles.nearbyLabel}>{n.label}</Text>
-                  <Text style={styles.nearbyDesc}>{n.desc}</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={16} color="#ccc" />
-              </TouchableOpacity>
-            ))}
-            <TouchableOpacity style={styles.findNearMeBtn}>
-              <Ionicons name="location" size={16} color="#fff" />
-              <Text style={styles.findNearMeText}>Find Near Me</Text>
-            </TouchableOpacity>
+            
+            {isSubscribed ? (
+              <>
+                {[
+                  { label: 'Nearby Pharmacies', desc: 'Find medicines near you',        icon: 'medkit-outline'   },
+                  { label: 'Nearby Doctors',    desc: 'Book a consultation',            icon: 'people-outline'   },
+                  { label: 'Nearby Hospitals',  desc: 'Emergency care centers',         icon: 'business-outline' },
+                ].map((n, i) => (
+                  <TouchableOpacity key={i} style={styles.nearbyRow}>
+                    <View style={styles.nearbyIcon}>
+                      <Ionicons name={n.icon as any} size={20} color={TEAL} />
+                    </View>
+                    <View style={styles.nearbyInfo}>
+                      <Text style={styles.nearbyLabel}>{n.label}</Text>
+                      <Text style={styles.nearbyDesc}>{n.desc}</Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={16} color="#ccc" />
+                  </TouchableOpacity>
+                ))}
+                <TouchableOpacity style={styles.findNearMeBtn}>
+                  <Ionicons name="location" size={16} color="#fff" />
+                  <Text style={styles.findNearMeText}>Find Near Me</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <View style={styles.lockedSectionPlaceholder}>
+                <Ionicons name="lock-closed" size={24} color={TEAL} style={{ marginBottom: 6 }} />
+                <Text style={styles.lockedSectionTitle}>Nearby Services Locked</Text>
+                <Text style={styles.lockedSectionText}>Locate pharmacies, doctors, and clinics in your area with a Premium plan.</Text>
+                <TouchableOpacity
+                  style={styles.lockedSectionBtn}
+                  onPress={() => router.push('/(tabs)/subscription' as any)}
+                >
+                  <Text style={styles.lockedSectionBtnText}>Unlock with Premium</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
 
           <View style={styles.continueCare}>
-            <View>
+            <View style={{ flex: 1 }}>
               <Text style={styles.continueCareTitle}>Continue care</Text>
               <Text style={styles.continueCareSub}>Chat with our AI Health Assistant for more guidance.</Text>
             </View>
-            <TouchableOpacity style={styles.chatNowBtn} onPress={() => router.push('/(tabs)/chat' as any)}>
-              <Ionicons name="chatbubble-ellipses" size={16} color="#fff" />
-              <Text style={styles.chatNowText}>Chat Now</Text>
+            <TouchableOpacity 
+              style={styles.chatNowBtn} 
+              onPress={() => {
+                if (!isSubscribed) {
+                  router.push('/(tabs)/subscription' as any);
+                } else {
+                  router.push('/(tabs)/chat' as any);
+                }
+              }}
+            >
+              <Ionicons name={isSubscribed ? "chatbubble-ellipses" : "lock-closed"} size={16} color="#fff" />
+              <Text style={styles.chatNowText}>{isSubscribed ? "Chat Now" : "Unlock Chat"}</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
@@ -1073,4 +1161,41 @@ const styles = StyleSheet.create({
   unlockTeaser: { marginTop: 14, gap: 8 },
   teaserRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   teaserText: { fontSize: 13, color: '#555' },
+  lockedSectionPlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 20,
+    paddingHorizontal: 16,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderStyle: 'dashed',
+    marginTop: 8,
+  },
+  lockedSectionTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#1a1a1a',
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  lockedSectionText: {
+    fontSize: 12,
+    color: '#666',
+    textAlign: 'center',
+    lineHeight: 18,
+    marginBottom: 14,
+  },
+  lockedSectionBtn: {
+    backgroundColor: TEAL,
+    borderRadius: 10,
+    paddingVertical: 9,
+    paddingHorizontal: 18,
+  },
+  lockedSectionBtnText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '700',
+  },
 });
