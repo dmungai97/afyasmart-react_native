@@ -2,6 +2,7 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert } from 'rea
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuthStore } from '@/src/store/authStore';
+import { useAffiliateStore } from '../services/affiliate.service';
 
 const GREEN = '#0B6E6E';
 const DARK_NAVY = '#0B1F2D';
@@ -11,6 +12,7 @@ export function AffiliateProfileScreen() {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const clearAuth = useAuthStore((s) => s.clearAuth);
+  const affiliateSince = useAffiliateStore((s) => s.affiliateSince);
 
   const formatPhone = (phone?: string) => {
     if (!phone) return '2547XXXXXXXX';
@@ -71,7 +73,7 @@ export function AffiliateProfileScreen() {
           </View>
           <Text style={styles.userName}>{name}</Text>
           <Text style={styles.userPhone}>{formatPhone(user?.phone)}</Text>
-          <Text style={styles.affiliateSince}>Affiliate since Apr 2024</Text>
+          {affiliateSince && <Text style={styles.affiliateSince}>Affiliate since {affiliateSince}</Text>}
         </View>
       </View>
 

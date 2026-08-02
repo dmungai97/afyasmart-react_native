@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
   FlatList, StyleSheet, Alert, ActivityIndicator, KeyboardAvoidingView, Platform
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useAffiliateStore, Withdrawal } from '../services/affiliate.service';
+import { useAffiliateStore } from '../services/affiliate.service';
+import { useAuthStore } from '@/src/store/authStore';
 
 const GREEN = '#0B6E6E';
 const GREEN_DARK = '#053E3E';
@@ -14,16 +15,22 @@ export function AffiliateWithdrawScreen() {
   const availableBalance = useAffiliateStore((s) => s.availableBalance);
   const withdrawals = useAffiliateStore((s) => s.withdrawals);
   const addWithdrawal = useAffiliateStore((s) => s.addWithdrawal);
+  const load = useAffiliateStore((s) => s.load);
+  const user = useAuthStore((s) => s.user);
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   const [amountStr, setAmountStr] = useState('');
-  const [phone, setPhone] = useState('254712345678');
+  const [phone, setPhone] = useState(user?.phone ?? '');
   const [loading, setLoading] = useState(false);
 
   const formatCurrency = (val: number) => {
     return `Ksh ${val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
 
-  const handleWithdraw = () => {
+  const handleWithdraw = async () => {
     const amt = parseFloat(amountStr);
     if (isNaN(amt) || amt <= 0) {
       Alert.alert('Invalid Amount', 'Please enter a valid amount to withdraw.');
@@ -43,21 +50,18 @@ export function AffiliateWithdrawScreen() {
     }
 
     setLoading(true);
+    const result = await addWithdrawal(amt, phone.trim());
+    setLoading(false);
 
-    // Simulate network delay
-    setTimeout(() => {
-      const success = addWithdrawal(amt, phone.trim());
-      setLoading(false);
-      if (success) {
-        Alert.alert(
-          'Withdrawal Initiated',
-          `Your withdrawal of Ksh ${amt.toLocaleString()} has been initiated to ${phone}.`
-        );
-        setAmountStr('');
-      } else {
-        Alert.alert('Error', 'Unable to process withdrawal request.');
-      }
-    }, 1500);
+    if (result.success) {
+      Alert.alert(
+        'Withdrawal Requested',
+        `Your withdrawal of Ksh ${amt.toLocaleString()} to ${phone} has been submitted for review.`
+      );
+      setAmountStr('');
+    } else {
+      Alert.alert('Error', result.message ?? 'Unable to process withdrawal request.');
+    }
   };
 
   const getStatusColor = (status: string) => {

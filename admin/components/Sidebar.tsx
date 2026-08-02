@@ -27,6 +27,7 @@ const STRINGS = {
   financialMgmt: "Financial Management",
   revenueIncome: "Revenue & Income",
   transactions: "Transactions",
+  affiliatePayouts: "Affiliate Payouts",
   userMgmt: "User Management",
   allUsers: "All Users",
   superAdmin: "Super Administrator",
@@ -70,6 +71,7 @@ const NAV: NavSection[] = [
     items: [
       { icon: "analytics-outline", label: STRINGS.revenueIncome, route: "/admin/transactions" },
       { icon: "receipt-outline", label: STRINGS.transactions, route: "/admin/transactions" },
+      { icon: "cash-outline", label: STRINGS.affiliatePayouts, route: "/admin/affiliate-payouts" },
     ],
   },
 ];

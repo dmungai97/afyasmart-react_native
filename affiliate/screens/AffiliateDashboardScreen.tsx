@@ -1,4 +1,5 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar } from 'react-native';
+import { useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAffiliateStore } from '../services/affiliate.service';
@@ -20,6 +21,15 @@ export function AffiliateDashboardScreen() {
   const activeUsersCount = useAffiliateStore((s) => s.activeUsersCount);
   const conversionRate = useAffiliateStore((s) => s.conversionRate);
   const affiliateId = useAffiliateStore((s) => s.affiliateId);
+  const earningsToday = useAffiliateStore((s) => s.earningsToday);
+  const earningsThisWeek = useAffiliateStore((s) => s.earningsThisWeek);
+  const earningsThisMonth = useAffiliateStore((s) => s.earningsThisMonth);
+  const loading = useAffiliateStore((s) => s.loading);
+  const load = useAffiliateStore((s) => s.load);
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   const formatCurrency = (val: number) => {
     return `Ksh ${val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -104,17 +114,19 @@ export function AffiliateDashboardScreen() {
         <View style={styles.overviewGrid}>
           <View style={styles.overviewCard}>
             <Text style={styles.overviewLabel}>Today</Text>
-            <Text style={[styles.overviewVal, { color: '#16A34A' }]}>Ksh 120</Text>
+            <Text style={[styles.overviewVal, { color: '#16A34A' }]}>{formatCurrency(earningsToday)}</Text>
           </View>
           <View style={styles.overviewCard}>
             <Text style={styles.overviewLabel}>This Week</Text>
-            <Text style={[styles.overviewVal, { color: '#16A34A' }]}>Ksh 540</Text>
+            <Text style={[styles.overviewVal, { color: '#16A34A' }]}>{formatCurrency(earningsThisWeek)}</Text>
           </View>
           <View style={styles.overviewCard}>
             <Text style={styles.overviewLabel}>This Month</Text>
-            <Text style={[styles.overviewVal, { color: '#16A34A' }]}>Ksh 1,840</Text>
+            <Text style={[styles.overviewVal, { color: '#16A34A' }]}>{formatCurrency(earningsThisMonth)}</Text>
           </View>
         </View>
+
+        {loading && <ActivityIndicator size="small" color={GREEN} style={{ marginTop: 16 }} />}
 
         {/* Performance Section */}
         <Text style={[styles.sectionTitle, { marginHorizontal: 20, marginTop: 24, marginBottom: 12 }]}>

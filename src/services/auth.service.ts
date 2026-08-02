@@ -146,12 +146,27 @@ export const loginUser = async (
   return { token, user };
 };
 
+// Resolves a human-readable referral code (?ref=AFYA-XXXXX) to the referring
+// user's uid via the public affiliateCodes mapping. This can only be read
+// once the new account is signed in (the mapping requires auth), which is
+// why this runs after createUserWithEmailAndPassword below, not before.
+const resolveReferrerUid = async (ref?: string | null): Promise<string | null> => {
+  if (!ref) return null;
+  try {
+    const snap = await getDoc(doc(firestore, "affiliateCodes", ref));
+    return snap.exists() ? ((snap.data().uid as string) ?? null) : null;
+  } catch {
+    return null;
+  }
+};
+
 export const registerUser = async (
   name: string,
   email: string,
   phone: string,
   password: string,
-  password_confirmation: string
+  password_confirmation: string,
+  referralCode?: string | null,
 ): Promise<AuthResponse> => {
   if (password !== password_confirmation) {
     throw new Error("Passwords do not match.");
@@ -172,8 +187,17 @@ export const registerUser = async (
     phone.trim(),
   );
 
+  // Resolved now that the account exists and is signed in. A referral code
+  // that fails to resolve (typo, unenrolled affiliate) is silently dropped
+  // rather than blocking registration.
+  const referredByUid = await resolveReferrerUid(referralCode);
+
+  // referred_by_uid is only ever set here, at account creation — Firestore
+  // rules don't allow it to change afterward, so referral attribution can't
+  // be gamed retroactively.
   await setDoc(doc(firestore, "users", credential.user.uid), {
     ...user,
+    ...(referredByUid ? { referred_by_uid: referredByUid } : {}),
     created_at: serverTimestamp(),
     updated_at: serverTimestamp(),
   });

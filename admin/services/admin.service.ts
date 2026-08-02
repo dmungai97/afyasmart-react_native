@@ -7,6 +7,7 @@ import {
   addDoc,
   updateDoc,
   deleteDoc,
+  increment,
   limit,
   orderBy,
   query,
@@ -517,6 +518,63 @@ export const rejectPayment = async (paymentId: string) => {
   await updateDoc(doc(firestore, "paymentRequests", paymentId), {
     paid: false,
     status: "failed",
+    updated_at: serverTimestamp(),
+  });
+};
+
+// ── Affiliate payouts ──────────────────────────────────────────────────────
+// Money movement itself happens outside the app (Safaricom portal or manual
+// disbursement) — this just tracks and approves/rejects the request. The
+// available_balance deduction already happened up front, atomically, inside
+// the requestPayout Cloud Function when the affiliate submitted the request.
+
+export type AdminAffiliatePayout = {
+  id: string;
+  affiliateUid: string;
+  phone: string;
+  amount: number;
+  status: string;
+  createdAt: string;
+};
+
+export const fetchAffiliatePayoutRequests = async (): Promise<AdminAffiliatePayout[]> => {
+  const snap = await getDocs(
+    query(collection(firestore, "payoutRequests"), orderBy("created_at", "desc")),
+  );
+  return snap.docs.map((d) => {
+    const data = d.data();
+    return {
+      id: d.id,
+      affiliateUid: data.affiliate_uid ?? "",
+      phone: data.phone ?? "",
+      amount: Number(data.amount ?? 0),
+      status: data.status ?? "pending",
+      createdAt: formatDate(data.created_at),
+    };
+  });
+};
+
+export const approveAffiliatePayout = async (payoutId: string) => {
+  await updateDoc(doc(firestore, "payoutRequests", payoutId), {
+    status: "paid",
+    updated_at: serverTimestamp(),
+  });
+};
+
+export const rejectAffiliatePayout = async (
+  payoutId: string,
+  affiliateUid: string,
+  amount: number,
+) => {
+  await updateDoc(doc(firestore, "payoutRequests", payoutId), {
+    status: "rejected",
+    updated_at: serverTimestamp(),
+  });
+
+  // Refund the amount that requestPayout deducted up front when the request
+  // was created.
+  await updateDoc(doc(firestore, "affiliates", affiliateUid), {
+    available_balance: increment(amount),
     updated_at: serverTimestamp(),
   });
 };

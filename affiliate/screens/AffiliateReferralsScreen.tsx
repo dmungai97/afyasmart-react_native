@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TextInput,
   TouchableOpacity, ScrollView, Share, Alert
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
-import { useAffiliateStore, Referral } from '../services/affiliate.service';
+import { useAffiliateStore } from '../services/affiliate.service';
 
 const GREEN = '#0B6E6E';
 const GREEN_DARK = '#053E3E';
@@ -16,6 +16,11 @@ export function AffiliateReferralsScreen() {
   const referralsCount = useAffiliateStore((s) => s.referralsCount);
   const activeUsersCount = useAffiliateStore((s) => s.activeUsersCount);
   const affiliateId = useAffiliateStore((s) => s.affiliateId);
+  const load = useAffiliateStore((s) => s.load);
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   const [activeTab, setActiveTab] = useState<'List' | 'Link'>('List');
   const [searchQuery, setSearchQuery] = useState('');

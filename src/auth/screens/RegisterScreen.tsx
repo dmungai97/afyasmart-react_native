@@ -91,7 +91,7 @@ Field.displayName = "Field";
 
 export function RegisterScreen() {
   const router = useRouter();
-  const { plan } = useLocalSearchParams<{ plan?: string }>();
+  const { plan, ref } = useLocalSearchParams<{ plan?: string; ref?: string }>();
 
   const setAuth = useAuthStore((state) => state.setAuth);
 
@@ -220,6 +220,7 @@ export function RegisterScreen() {
         phone.trim(),
         password,
         confirm,
+        ref,
       );
 
       await setAuth(data.token, data.user, true);

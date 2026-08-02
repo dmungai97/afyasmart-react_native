@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useAffiliateStore, Earning } from '../services/affiliate.service';
+import { useAffiliateStore } from '../services/affiliate.service';
 
 const GREEN = '#0B6E6E';
 const GREEN_DARK = '#053E3E';
@@ -12,6 +12,11 @@ export function AffiliateEarningsScreen() {
   const availableBalance = useAffiliateStore((s) => s.availableBalance);
   const pendingEarnings = useAffiliateStore((s) => s.pendingEarnings);
   const totalEarned = useAffiliateStore((s) => s.totalEarned);
+  const load = useAffiliateStore((s) => s.load);
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   const [activeTab, setActiveTab] = useState<'Overview' | 'Transactions'>('Transactions');
   const [filterPeriod, setFilterPeriod] = useState<'Today' | 'This Week' | 'This Month' | 'All'>('This Month');

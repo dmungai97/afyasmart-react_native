@@ -1,7 +1,10 @@
+import { useEffect, useState } from 'react';
 import { Tabs } from 'expo-router';
-import { View, Platform } from 'react-native';
+import { View, Platform, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { AffiliateEnrollScreen } from '@affiliate';
+import { useAffiliateStore } from '@affiliate/services/affiliate.service';
 
 const GREEN = '#0B6E6E';
 
@@ -37,6 +40,25 @@ function TabIcon({
 
 export default function AffiliateLayout() {
   const insets = useSafeAreaInsets();
+  const enrolled = useAffiliateStore((s) => s.enrolled);
+  const load = useAffiliateStore((s) => s.load);
+  const [checked, setChecked] = useState(false);
+
+  useEffect(() => {
+    load().finally(() => setChecked(true));
+  }, [load]);
+
+  if (!checked) {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F5F7FA' }}>
+        <ActivityIndicator size="large" color={GREEN} />
+      </View>
+    );
+  }
+
+  if (!enrolled) {
+    return <AffiliateEnrollScreen />;
+  }
 
   return (
     <Tabs
