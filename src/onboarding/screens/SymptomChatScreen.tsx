@@ -14,6 +14,22 @@ const TEAL      = '#0B6E6E';
 const TEAL_DARK = '#063D3D';
 const BG        = '#F0F7F7';
 
+const AGE_GROUP_TO_AGE: Record<string, number> = {
+  'Under 18': 16,
+  '18 – 30': 24,
+  '31 – 45': 38,
+  '46 – 60': 53,
+  'Over 60': 68,
+};
+
+const FEELING_TO_SEVERITY: Record<string, string> = {
+  'Very unwell': 'Severe',
+  'Unwell': 'Moderate',
+  'Okay': 'Mild',
+  'Good': 'Mild',
+  'Great': 'Mild',
+};
+
 type Message = {
   role:    'assistant' | 'user';
   text:    string;
@@ -31,6 +47,7 @@ export function SymptomChatScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const setPendingDiagnosis = useDiagnosisStore((s) => s.setPendingDiagnosis);
+  const healthCheckAnswers = useDiagnosisStore((s) => s.healthCheckAnswers);
 
   const [messages, setMessages]   = useState<Message[]>(INITIAL_MESSAGES);
   const [input, setInput]         = useState('');
@@ -106,11 +123,11 @@ export function SymptomChatScreen() {
     try {
       const data = await requestSymptomsAnalysis({
         symptoms: [text],
-        age: 25,
+        age: AGE_GROUP_TO_AGE[healthCheckAnswers?.age ?? ''] ?? 25,
         gender: 'other',
         duration: '1-3 days',
-        severity: 'Moderate',
-        answers: {},
+        severity: FEELING_TO_SEVERITY[healthCheckAnswers?.feeling ?? ''] ?? 'Moderate',
+        answers: healthCheckAnswers?.concern ? { concern: healthCheckAnswers.concern } : {},
       });
 
       const formattedDiagnosis = {

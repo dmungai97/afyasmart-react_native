@@ -12,11 +12,17 @@ const TEAL       = '#0B6E6E';
 const TEAL_DARK  = '#063D3D';
 const BG         = '#F0F7F7';
 
-const LOCKED_CONDITIONS = [
-  { icon: 'fitness-outline',   label: 'Condition 1',  severity: 'Medium', color: '#F59E0B' },
-  { icon: 'thermometer-outline', label: 'Condition 2', severity: 'High',   color: '#EF4444' },
-  { icon: 'bandage-outline',   label: 'Condition 3',  severity: 'Low',    color: '#22C55E' },
+const FALLBACK_CONDITIONS = [
+  { icon: 'fitness-outline',   severity: 'Medium', color: '#F59E0B' },
+  { icon: 'thermometer-outline', severity: 'High',   color: '#EF4444' },
+  { icon: 'bandage-outline',   severity: 'Low',    color: '#22C55E' },
 ];
+
+const SEVERITY_ICON: Record<string, string> = {
+  High: 'thermometer-outline',
+  Medium: 'fitness-outline',
+  Low: 'bandage-outline',
+};
 
 const UNLOCK_FEATURES = [
   { icon: 'list-circle-outline',  text: 'Possible conditions with probabilities' },
@@ -36,11 +42,27 @@ export function LockedResultsScreen() {
   const router = useRouter();
   const diagnosis = useDiagnosisStore((s) => s.pendingDiagnosis);
   const token = useAuthStore((s) => s.token);
+  const completeOnboarding = useAuthStore((s) => s.completeOnboarding);
 
   const fadeAnim   = useRef(new Animated.Value(0)).current;
   const slideAnim  = useRef(new Animated.Value(30)).current;
   const pulseAnim  = useRef(new Animated.Value(1)).current;
   const shakeAnim  = useRef(new Animated.Value(0)).current;
+
+  const displayConditions = diagnosis?.conditions.length
+    ? diagnosis.conditions.map((c) => ({
+        icon: SEVERITY_ICON[c.level] ?? 'fitness-outline',
+        severity: c.level,
+        color: c.color,
+      }))
+    : FALLBACK_CONDITIONS;
+
+  useEffect(() => {
+    // This is the true end of the onboarding funnel (welcome -> health-check ->
+    // symptom-chat -> analysis-loading -> here) regardless of whether the user
+    // subscribes next, so this is where onboarding should be marked complete.
+    completeOnboarding();
+  }, []);
 
   useEffect(() => {
     Animated.parallel([
@@ -103,7 +125,7 @@ export function LockedResultsScreen() {
         {/* Locked conditions */}
         <Animated.View style={[styles.section, { opacity: fadeAnim }]}>
           <Text style={styles.sectionTitle}>Your Results</Text>
-          {LOCKED_CONDITIONS.map((c, i) => (
+          {displayConditions.map((c, i) => (
             <View key={i} style={styles.conditionCard}>
               <View style={styles.conditionLeft}>
                 <View style={[styles.conditionIconBg, { backgroundColor: c.color + '20' }]}>

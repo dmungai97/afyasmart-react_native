@@ -19,10 +19,18 @@ export type PendingDiagnosis = {
   preparedAt: string;
 };
 
+export type HealthCheckAnswers = {
+  age?: string;
+  feeling?: string;
+  concern?: string;
+};
+
 type DiagnosisState = {
   pendingDiagnosis: PendingDiagnosis | null;
+  healthCheckAnswers: HealthCheckAnswers | null;
   setPendingDiagnosis: (diagnosis: PendingDiagnosis) => void;
   clearPendingDiagnosis: () => void;
+  setHealthCheckAnswers: (answers: HealthCheckAnswers) => void;
 };
 
 export function buildDiagnosisFromSymptoms(symptoms: string): PendingDiagnosis {
@@ -73,6 +81,8 @@ export function buildDiagnosisFromSymptoms(symptoms: string): PendingDiagnosis {
 
 export const useDiagnosisStore = create<DiagnosisState>((set) => ({
   pendingDiagnosis: null,
+  healthCheckAnswers: null,
   setPendingDiagnosis: (diagnosis) => set({ pendingDiagnosis: diagnosis }),
   clearPendingDiagnosis: () => set({ pendingDiagnosis: null }),
+  setHealthCheckAnswers: (answers) => set({ healthCheckAnswers: answers }),
 }));

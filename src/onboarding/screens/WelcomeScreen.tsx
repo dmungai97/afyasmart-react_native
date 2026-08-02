@@ -12,14 +12,28 @@ import {
 
 const TEAL_DARK = "#061A1A";
 
+const seededDoctors = require("../../../seed-data/doctors.json") as { hospital: string }[];
+const seededPharmacies = require("../../../seed-data/pharmacies.json") as unknown[];
+
+// A few recognizable, real institutions to name-drop instead of a generic
+// "trusted by Kenyans" badge — pulled from the same seed data the app itself
+// ships with, so the count and names stay accurate as that data grows.
+const FEATURED_HOSPITALS = ["Kenyatta National Hospital", "Aga Khan University Hospital", "Nairobi Hospital"];
+const featuredHospitalNames = FEATURED_HOSPITALS.filter((h) =>
+  seededDoctors.some((d) => d.hospital === h),
+);
+
 const STRINGS = {
   appName1: "Afya",
   appName2: "Smart",
   taglineText: "Find out what your symptoms\nmean in ",
   taglineAccent: "60 seconds",
-  trusted: "Trusted by Kenyans",
+  trusted: `${seededDoctors.length}+ Doctors · ${seededPharmacies.length}+ Pharmacies`,
   secure: "Private & Secure",
   instant: "Instant Results",
+  networkNote: featuredHospitalNames.length
+    ? `Network includes ${featuredHospitalNames.join(", ")} & more nationwide`
+    : "",
   ctaText: "Start Free Health Check",
   disclaimer: "Not a replacement for professional medical advice",
 };
@@ -218,6 +232,12 @@ export function WelcomeScreen() {
         </View>
       </Animated.View>
 
+      {!!STRINGS.networkNote && (
+        <Animated.Text style={[styles.networkNote, { opacity: fadeAnim }]}>
+          {STRINGS.networkNote}
+        </Animated.Text>
+      )}
+
       {/* CTA */}
       <Animated.View
         style={[
@@ -382,6 +402,13 @@ const styles = StyleSheet.create({
     height: 3,
     borderRadius: 1.5,
     backgroundColor: "rgba(255,255,255,0.25)",
+  },
+  networkNote: {
+    color: "rgba(255,255,255,0.4)",
+    fontSize: 10,
+    textAlign: "center",
+    marginBottom: 20,
+    paddingHorizontal: 12,
   },
   ctaSection: { width: "100%", alignItems: "center", gap: 10 },
   ctaBtn: {

@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useAuthStore } from '@/src/store/authStore';
+import { useDiagnosisStore } from '@/src/store/diagnosisStore';
 
 const TEAL      = '#0B6E6E';
 const TEAL_DARK = '#063D3D';
@@ -40,7 +40,7 @@ const STEPS = [
 
 export function HealthCheckScreen() {
   const router             = useRouter();
-  const completeOnboarding = useAuthStore((s) => s.completeOnboarding);
+  const setHealthCheckAnswers = useDiagnosisStore((s) => s.setHealthCheckAnswers);
 
   const [step, setStep]       = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
@@ -73,7 +73,11 @@ export function HealthCheckScreen() {
   };
 
   const handleFinish = async (finalAnswers: Record<string, string>) => {
-    await completeOnboarding();
+    setHealthCheckAnswers({
+      age: finalAnswers.age,
+      feeling: finalAnswers.feeling,
+      concern: finalAnswers.concern,
+    });
     router.push('/(onboarding)/symptom-chat' as any);
   };
 
