@@ -32,11 +32,16 @@ export interface SymptomsAnalysisResponse {
   self_care: string[];
 }
 
-// Toggle this flag to switch between custom Laravel API and full Firebase Cloud Functions in the future
-const USE_FIREBASE_FUNCTIONS = process.env.EXPO_PUBLIC_USE_FIREBASE_FUNCTIONS === "true";
-
-type FirebaseExtra = { mpesaApiBaseUrl?: string; functionsBaseUrl?: string };
+type FirebaseExtra = {
+  mpesaApiBaseUrl?: string;
+  functionsBaseUrl?: string;
+  useFirebaseFunctions?: boolean;
+};
 const extra = (Constants.expoConfig?.extra?.firebase ?? {}) as FirebaseExtra;
+
+// Toggle this flag to switch between the legacy Laravel API and Firebase Cloud Functions
+const USE_FIREBASE_FUNCTIONS =
+  process.env.EXPO_PUBLIC_USE_FIREBASE_FUNCTIONS === "true" || extra.useFirebaseFunctions === true;
 
 const symptomsApiBaseUrl = USE_FIREBASE_FUNCTIONS
   ? (process.env.EXPO_PUBLIC_FUNCTIONS_BASE_URL ?? extra.functionsBaseUrl ?? "https://us-central1-afya-smart-377ad.cloudfunctions.net")

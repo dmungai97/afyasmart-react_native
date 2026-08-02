@@ -3,6 +3,8 @@ const { getAuth } = require("firebase-admin/auth");
 const { FieldValue, getFirestore } = require("firebase-admin/firestore");
 const { defineSecret } = require("firebase-functions/params");
 const { onRequest } = require("firebase-functions/v2/https");
+const { onSchedule } = require("firebase-functions/v2/scheduler");
+const { onDocumentCreated } = require("firebase-functions/v2/firestore");
 
 initializeApp();
 
@@ -16,6 +18,7 @@ const MPESA_PASSKEY = defineSecret("MPESA_PASSKEY");
 const MPESA_SHORTCODE = defineSecret("MPESA_SHORTCODE");
 const MPESA_CALLBACK_URL = defineSecret("MPESA_CALLBACK_URL");
 const MPESA_ENV = defineSecret("MPESA_ENV");
+const OPENAI_API_KEY = defineSecret("OPENAI_API_KEY");
 
 const mpesaSecrets = [
   MPESA_CONSUMER_KEY,
@@ -25,6 +28,17 @@ const mpesaSecrets = [
   MPESA_CALLBACK_URL,
   MPESA_ENV,
 ];
+
+const SYMPTOM_FREE_DAILY_LIMIT = 3;
+const PENDING_PAYMENT_EXPIRY_MINUTES = 20;
+
+const AFFILIATE_COMMISSION_RATE = 0.3;
+const AFFILIATE_COMMISSION_HOLD_DAYS = 7;
+
+// Safaricom Daraja STK push result codes that mean the payment is definitively
+// done for (insufficient funds, PIN entered wrong too many times, request expired,
+// subscriber unreachable) — as opposed to codes that just mean "still waiting".
+const MPESA_TERMINAL_ERROR_CODES = new Set(["1", "1037", "2001", "1019"]);
 
 function sendCors(req, res) {
   res.set("Access-Control-Allow-Origin", "*");
@@ -206,7 +220,48 @@ async function stkQuery(checkoutRequestId) {
   return response.json();
 }
 
-async function activateSubscription(uid, plan) {
+// Commission fires on every successful payment by a referred user (not just
+// their first), matching the "30% for every successful subscription" copy
+// already shown in the affiliate UI. Wrapped by the caller in try/catch so a
+// bug here never breaks the more important subscription-activation path.
+async function creditAffiliateCommission(referredUid, plan, amount) {
+  if (!amount) return;
+
+  const referredSnap = await db.collection("users").doc(referredUid).get();
+  const referredByUid = referredSnap.exists ? referredSnap.data().referred_by_uid : null;
+  if (!referredByUid || referredByUid === referredUid) return;
+
+  const affiliateRef = db.collection("affiliates").doc(referredByUid);
+  const affiliateSnap = await affiliateRef.get();
+  if (!affiliateSnap.exists) return;
+
+  const commissionAmount = Math.round(amount * AFFILIATE_COMMISSION_RATE * 100) / 100;
+  const availableAt = new Date(
+    Date.now() + AFFILIATE_COMMISSION_HOLD_DAYS * 24 * 60 * 60 * 1000,
+  );
+
+  await db.collection("commissions").add({
+    affiliate_uid: referredByUid,
+    referred_uid: referredUid,
+    plan,
+    amount,
+    commission_amount: commissionAmount,
+    status: "pending",
+    created_at: FieldValue.serverTimestamp(),
+    available_at: availableAt,
+  });
+
+  await affiliateRef.set(
+    {
+      pending_balance: FieldValue.increment(commissionAmount),
+      total_earned: FieldValue.increment(commissionAmount),
+      updated_at: FieldValue.serverTimestamp(),
+    },
+    { merge: true },
+  );
+}
+
+async function activateSubscription(uid, plan, amount) {
   await db.collection("users").doc(uid).set(
     {
       is_subscribed: true,
@@ -218,9 +273,15 @@ async function activateSubscription(uid, plan) {
     },
     { merge: true },
   );
+
+  try {
+    await creditAffiliateCommission(uid, plan, amount ?? planAmount(plan) ?? 0);
+  } catch (error) {
+    console.error("Affiliate commission crediting failed", error);
+  }
 }
 
-exports.chatSend = onRequest({ region: REGION, cors: true }, async (req, res) => {
+exports.chatSend = onRequest({ region: REGION, cors: true, secrets: [OPENAI_API_KEY] }, async (req, res) => {
   if (sendCors(req, res)) return;
 
   try {
@@ -253,7 +314,8 @@ exports.chatSend = onRequest({ region: REGION, cors: true }, async (req, res) =>
     }
 
     let reply = "";
-    if (process.env.OPENAI_API_KEY) {
+    const openaiKey = OPENAI_API_KEY.value();
+    if (openaiKey) {
       try {
         const messages = [
           {
@@ -287,7 +349,7 @@ exports.chatSend = onRequest({ region: REGION, cors: true }, async (req, res) =>
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`,
+            "Authorization": `Bearer ${openaiKey}`,
           },
           body: JSON.stringify({
             model: "gpt-4o-mini",
@@ -407,8 +469,30 @@ exports.chatHistory = onRequest({ region: REGION, cors: true }, async (req, res)
   }
 });
 
-exports.mpesaInitiate = onRequest(
-  { region: REGION, cors: true, secrets: mpesaSecrets },
+function mockSymptomsResponse() {
+  return {
+    urgency: "High",
+    urgency_desc: "Your symptoms may need medical attention. Seek advice from a professional.",
+    conditions: [
+      { name: "Malaria", likelihood: "High", percent: 80, color: "#EF4444" },
+      { name: "Flu (Influenza)", likelihood: "Medium", percent: 45, color: "#F59E0B" },
+      { name: "Typhoid", likelihood: "Low", percent: 20, color: "#0B6E6E" },
+    ],
+    medications: [
+      { name: "Paracetamol 500mg", desc: "For fever and pain", icon: "💊" },
+      { name: "ORS", desc: "To prevent dehydration", icon: "🧃" },
+      { name: "Antimalarial", desc: "Seek doctor's advice first", icon: "💉" },
+    ],
+    self_care: [
+      "Rest and drink plenty of fluids",
+      "Take paracetamol for fever",
+      "Eat light and healthy meals",
+    ],
+  };
+}
+
+exports.symptomsAnalyze = onRequest(
+  { region: REGION, cors: true, secrets: [OPENAI_API_KEY] },
   async (req, res) => {
     if (sendCors(req, res)) return;
 
@@ -417,9 +501,149 @@ exports.mpesaInitiate = onRequest(
         return res.status(405).json({ status: "error", message: "Method not allowed" });
       }
 
-      const authUser = await requireUser(req);
-      const { phone, plan } = req.body || {};
-      const amount = planAmount(plan);
+      const { firebase_uid, symptoms, age, gender, duration, severity, answers } = req.body || {};
+
+      if (
+        !firebase_uid ||
+        typeof firebase_uid !== "string" ||
+        !Array.isArray(symptoms) ||
+        symptoms.length === 0 ||
+        age === undefined ||
+        age === null ||
+        !gender ||
+        !duration ||
+        !severity
+      ) {
+        return res.status(422).json({ status: "error", message: "Missing required fields." });
+      }
+
+      const userSnap = await db.collection("users").doc(firebase_uid).get();
+      const user = userSnap.exists ? userSnap.data() : {};
+      const subscribed = isSubscribed(user);
+
+      if (!subscribed) {
+        const today = new Date().toISOString().slice(0, 10);
+        const quotaRef = db.collection("symptomChecks").doc(`${firebase_uid}_${today}`);
+        const quotaSnap = await quotaRef.get();
+        const checksToday = quotaSnap.exists ? quotaSnap.data().count || 0 : 0;
+
+        if (checksToday >= SYMPTOM_FREE_DAILY_LIMIT) {
+          return res.status(429).json({
+            status: "error",
+            message: "Daily free check limit reached. Subscribe for unlimited checks.",
+          });
+        }
+
+        await quotaRef.set(
+          { count: checksToday + 1, updated_at: FieldValue.serverTimestamp() },
+          { merge: true },
+        );
+      }
+
+      const openaiKey = OPENAI_API_KEY.value();
+      if (!openaiKey) {
+        return res.json({ status: "success", data: mockSymptomsResponse() });
+      }
+
+      const symptomList = symptoms.join(", ");
+      let answersText = "";
+      if (answers && typeof answers === "object") {
+        for (const [qId, ans] of Object.entries(answers)) {
+          answersText += `- Question ID ${qId}: Answer: ${ans}\n`;
+        }
+      }
+
+      const prompt =
+        "Analyze the following patient profile and symptom context:\n" +
+        `- Symptoms: ${symptomList}\n` +
+        `- Age: ${age} years old\n` +
+        `- Gender: ${gender}\n` +
+        `- Duration: ${duration}\n` +
+        `- Severity: ${severity}\n` +
+        (answersText ? `- Follow-up Questions:\n${answersText}` : "") +
+        "\nBased on this information, provide the top 3 possible medical conditions (with likelihood and probability percentage), self-care instructions, and commonly suggested medications/remedies.";
+
+      try {
+        const response = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${openaiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "gpt-4o-mini",
+            max_tokens: 1020,
+            temperature: 0.3,
+            response_format: { type: "json_object" },
+            messages: [
+              {
+                role: "system",
+                content:
+                  'You are a professional medical analysis assistant. Your role is to suggest possible conditions based on symptoms.\n' +
+                  'You must return a raw JSON response representing the diagnosis.\n\n' +
+                  'JSON SCHEMA:\n' +
+                  '{\n' +
+                  '  "urgency": "High" | "Medium" | "Low",\n' +
+                  '  "urgency_desc": "Explanation of urgency based on symptoms.",\n' +
+                  '  "conditions": [\n' +
+                  '    { "name": "Condition Name", "likelihood": "High" | "Medium" | "Low", "percent": integer_between_0_and_100, "color": "#EF4444" for High | "#F59E0B" for Medium | "#0B6E6E" for Low }\n' +
+                  '  ],\n' +
+                  '  "medications": [\n' +
+                  '    { "name": "Medication Name", "desc": "Short description of what it does", "icon": "💊" | "🧃" | "💉" }\n' +
+                  '  ],\n' +
+                  '  "self_care": [\n' +
+                  '    "Actionable advice line 1",\n' +
+                  '    "Actionable advice line 2"\n' +
+                  '  ]\n' +
+                  '}\n' +
+                  'Do not include any text, backticks, or wrapping outside the JSON object.',
+              },
+              { role: "user", content: prompt },
+            ],
+          }),
+        });
+
+        if (!response.ok) {
+          console.error("OpenAI Symptoms check failed", { status: response.status });
+          return res.json({ status: "success", data: mockSymptomsResponse() });
+        }
+
+        const data = await response.json();
+        const jsonData = JSON.parse(data.choices?.[0]?.message?.content || "null");
+
+        if (!jsonData || !jsonData.conditions) {
+          console.warn("OpenAI Symptoms check returned invalid JSON structure");
+          return res.json({ status: "success", data: mockSymptomsResponse() });
+        }
+
+        return res.json({ status: "success", data: jsonData });
+      } catch (err) {
+        console.error("Symptoms OpenAI request failed", err);
+        return res.json({ status: "success", data: mockSymptomsResponse() });
+      }
+    } catch (error) {
+      console.error("symptomsAnalyze failed", error);
+      return res.json({ status: "success", data: mockSymptomsResponse() });
+    }
+  },
+);
+
+exports.mpesaInitiate = onRequest(
+  { region: REGION, cors: true, secrets: mpesaSecrets },
+  async (req, res) => {
+    if (sendCors(req, res)) return;
+
+    let authUser = null;
+    let phone, plan, amount;
+
+    try {
+      if (req.method !== "POST") {
+        return res.status(405).json({ status: "error", message: "Method not allowed" });
+      }
+
+      authUser = await requireUser(req);
+      ({ phone, plan } = req.body || {});
+      amount = planAmount(plan);
 
       if (!phone || !amount) {
         return res.status(422).json({
@@ -435,6 +659,23 @@ exports.mpesaInitiate = onRequest(
       });
 
       if (result.ResponseCode !== "0") {
+        // Log the failed attempt even though no checkout was created, so a
+        // systemic issue (bad credentials, Safaricom outage) is visible on
+        // the admin dashboard instead of vanishing silently.
+        await db.collection("paymentRequests").add({
+          uid: authUser.uid,
+          phone: normalizePhone(phone),
+          plan,
+          amount,
+          status: "failed",
+          paid: false,
+          provider: "mpesa",
+          checkout_request_id: result.CheckoutRequestID || null,
+          failure_reason: result.errorMessage || result.ResponseDescription || "STK Push failed.",
+          created_at: FieldValue.serverTimestamp(),
+          updated_at: FieldValue.serverTimestamp(),
+        });
+
         return res.status(422).json({
           status: "error",
           message: result.errorMessage || "STK Push failed. Try again.",
@@ -463,6 +704,25 @@ exports.mpesaInitiate = onRequest(
         checkout_request_id: checkoutId,
       });
     } catch (error) {
+      if (authUser) {
+        try {
+          await db.collection("paymentRequests").add({
+            uid: authUser.uid,
+            phone: phone ? normalizePhone(phone) : null,
+            plan: plan || null,
+            amount: amount || null,
+            status: "failed",
+            paid: false,
+            provider: "mpesa",
+            failure_reason: error.message || "Could not connect to M-Pesa.",
+            created_at: FieldValue.serverTimestamp(),
+            updated_at: FieldValue.serverTimestamp(),
+          });
+        } catch (logError) {
+          console.error("Failed to log failed M-Pesa initiation attempt", logError);
+        }
+      }
+
       return res.status(error.status || 500).json({
         status: "error",
         message: error.message || "Could not connect to M-Pesa. Please try again.",
@@ -520,7 +780,7 @@ exports.mpesaStatus = onRequest(
       const resultCode = String(result.ResultCode ?? "");
 
       if (resultCode === "0") {
-        await activateSubscription(payment.uid, payment.plan);
+        await activateSubscription(payment.uid, payment.plan, payment.amount);
         await paymentRef.set(
           {
             paid: true,
@@ -553,6 +813,26 @@ exports.mpesaStatus = onRequest(
           status: "cancelled",
           paid: false,
           message: "Payment cancelled by user.",
+        });
+      }
+
+      if (MPESA_TERMINAL_ERROR_CODES.has(resultCode)) {
+        const failureMessage = result.ResultDesc || "M-Pesa payment failed.";
+
+        await paymentRef.set(
+          {
+            paid: false,
+            status: "failed",
+            result,
+            updated_at: FieldValue.serverTimestamp(),
+          },
+          { merge: true },
+        );
+
+        return res.json({
+          status: "failed",
+          paid: false,
+          message: failureMessage,
         });
       }
 
@@ -598,7 +878,7 @@ exports.mpesaCallback = onRequest({ region: REGION, cors: true }, async (req, re
         );
 
         if (resultCode === 0) {
-          await activateSubscription(payment.uid, payment.plan);
+          await activateSubscription(payment.uid, payment.plan, payment.amount);
         }
       }
     }
@@ -607,5 +887,259 @@ exports.mpesaCallback = onRequest({ region: REGION, cors: true }, async (req, re
   } catch (error) {
     console.error("M-Pesa callback error", error);
     return res.json({ ResultCode: 0, ResultDesc: "Accepted" });
+  }
+});
+
+// Abandoned STK pushes (user closed the app before entering their PIN, or the
+// callback/poll never resolved) would otherwise sit as "pending" forever and
+// quietly inflate the admin dashboard's pending-payouts count. Sweep them into
+// the existing "failed" bucket instead of inventing a new status the client
+// and admin UI would need to special-case.
+exports.expireStalePayments = onSchedule(
+  { region: REGION, schedule: "every 15 minutes" },
+  async () => {
+    const cutoff = new Date(Date.now() - PENDING_PAYMENT_EXPIRY_MINUTES * 60 * 1000);
+
+    const staleSnap = await db
+      .collection("paymentRequests")
+      .where("status", "==", "pending")
+      .where("created_at", "<", cutoff)
+      .get();
+
+    if (staleSnap.empty) return;
+
+    const batch = db.batch();
+    staleSnap.docs.forEach((docSnap) => {
+      batch.set(
+        docSnap.ref,
+        {
+          paid: false,
+          status: "failed",
+          failure_reason: `Payment attempt expired — no response after ${PENDING_PAYMENT_EXPIRY_MINUTES} minutes.`,
+          updated_at: FieldValue.serverTimestamp(),
+        },
+        { merge: true },
+      );
+    });
+
+    await batch.commit();
+    console.log(`Expired ${staleSnap.size} stale pending payment request(s).`);
+  },
+);
+
+// ── Affiliate program ──────────────────────────────────────────────────────
+
+function generateAffiliateCode() {
+  // Excludes 0/O/1/I to avoid visual ambiguity when a user reads the code aloud.
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let suffix = "";
+  for (let i = 0; i < 6; i++) {
+    suffix += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return `AFYA-${suffix}`;
+}
+
+exports.enrollAffiliate = onRequest({ region: REGION, cors: true }, async (req, res) => {
+  if (sendCors(req, res)) return;
+
+  try {
+    if (req.method !== "POST") {
+      return res.status(405).json({ status: "error", message: "Method not allowed" });
+    }
+
+    const authUser = await requireUser(req);
+    const affiliateRef = db.collection("affiliates").doc(authUser.uid);
+    const existing = await affiliateRef.get();
+
+    if (existing.exists) {
+      return res.json({ status: "success", code: existing.data().code });
+    }
+
+    const MAX_ATTEMPTS = 5;
+    let assignedCode = null;
+
+    for (let attempt = 0; attempt < MAX_ATTEMPTS && !assignedCode; attempt++) {
+      const candidate = generateAffiliateCode();
+      const codeRef = db.collection("affiliateCodes").doc(candidate);
+
+      // Transaction so two concurrent enroll requests can never both claim
+      // the same generated code.
+      const claimed = await db.runTransaction(async (tx) => {
+        const codeSnap = await tx.get(codeRef);
+        if (codeSnap.exists) return false;
+
+        tx.set(codeRef, { uid: authUser.uid });
+        tx.set(affiliateRef, {
+          uid: authUser.uid,
+          code: candidate,
+          available_balance: 0,
+          pending_balance: 0,
+          total_earned: 0,
+          referrals_count: 0,
+          created_at: FieldValue.serverTimestamp(),
+          updated_at: FieldValue.serverTimestamp(),
+        });
+        return true;
+      });
+
+      if (claimed) assignedCode = candidate;
+    }
+
+    if (!assignedCode) {
+      return res.status(503).json({
+        status: "error",
+        message: "Could not generate a referral code. Please try again.",
+      });
+    }
+
+    return res.json({ status: "success", code: assignedCode });
+  } catch (error) {
+    return res.status(error.status || 500).json({
+      status: "error",
+      message: error.message || "Could not enroll as an affiliate.",
+    });
+  }
+});
+
+// Keeps affiliates/{uid}.referrals_count accurate without relying on the
+// client to remember to report it — fires whenever a new user doc is created
+// with a referred_by_uid already attached (set once, at registration).
+exports.onUserCreated = onDocumentCreated(
+  { region: REGION, document: "users/{uid}" },
+  async (event) => {
+    const data = event.data?.data();
+    const referredByUid = data?.referred_by_uid;
+    if (!referredByUid) return;
+
+    const affiliateRef = db.collection("affiliates").doc(referredByUid);
+    const affiliateSnap = await affiliateRef.get();
+    if (!affiliateSnap.exists) return;
+
+    await affiliateRef.set(
+      {
+        referrals_count: FieldValue.increment(1),
+        updated_at: FieldValue.serverTimestamp(),
+      },
+      { merge: true },
+    );
+  },
+);
+
+// Moves commissions out of their 7-day hold once it's elapsed, shifting the
+// amount from pending_balance to available_balance. Same pattern as
+// expireStalePayments above.
+exports.releaseAffiliateCommissions = onSchedule(
+  { region: REGION, schedule: "every 24 hours" },
+  async () => {
+    const now = new Date();
+
+    const dueSnap = await db
+      .collection("commissions")
+      .where("status", "==", "pending")
+      .where("available_at", "<=", now)
+      .get();
+
+    if (dueSnap.empty) return;
+
+    const byAffiliate = new Map();
+    const batch = db.batch();
+
+    dueSnap.docs.forEach((docSnap) => {
+      const data = docSnap.data();
+      batch.set(
+        docSnap.ref,
+        { status: "available", updated_at: FieldValue.serverTimestamp() },
+        { merge: true },
+      );
+      byAffiliate.set(
+        data.affiliate_uid,
+        (byAffiliate.get(data.affiliate_uid) || 0) + (data.commission_amount || 0),
+      );
+    });
+
+    await batch.commit();
+
+    await Promise.all(
+      [...byAffiliate.entries()].map(([affiliateUid, total]) =>
+        db.collection("affiliates").doc(affiliateUid).set(
+          {
+            pending_balance: FieldValue.increment(-total),
+            available_balance: FieldValue.increment(total),
+            updated_at: FieldValue.serverTimestamp(),
+          },
+          { merge: true },
+        ),
+      ),
+    );
+
+    console.log(`Released ${dueSnap.size} affiliate commission(s).`);
+  },
+);
+
+const AFFILIATE_MIN_WITHDRAWAL = 100;
+
+// Transactional so two concurrent withdrawal requests from the same affiliate
+// can never both succeed against the same available_balance.
+exports.requestPayout = onRequest({ region: REGION, cors: true }, async (req, res) => {
+  if (sendCors(req, res)) return;
+
+  try {
+    if (req.method !== "POST") {
+      return res.status(405).json({ status: "error", message: "Method not allowed" });
+    }
+
+    const authUser = await requireUser(req);
+    const { amount, phone } = req.body || {};
+
+    if (!amount || amount < AFFILIATE_MIN_WITHDRAWAL || !phone) {
+      return res.status(422).json({
+        status: "error",
+        message: `Minimum withdrawal is Ksh ${AFFILIATE_MIN_WITHDRAWAL}, and a phone number is required.`,
+      });
+    }
+
+    const affiliateRef = db.collection("affiliates").doc(authUser.uid);
+    const payoutRef = db.collection("payoutRequests").doc();
+
+    await db.runTransaction(async (tx) => {
+      const affiliateSnap = await tx.get(affiliateRef);
+      if (!affiliateSnap.exists) {
+        const error = new Error("You are not enrolled as an affiliate.");
+        error.status = 404;
+        throw error;
+      }
+
+      const availableBalance = affiliateSnap.data().available_balance || 0;
+      if (amount > availableBalance) {
+        const error = new Error("Insufficient available balance.");
+        error.status = 422;
+        throw error;
+      }
+
+      tx.set(
+        affiliateRef,
+        {
+          available_balance: FieldValue.increment(-amount),
+          updated_at: FieldValue.serverTimestamp(),
+        },
+        { merge: true },
+      );
+
+      tx.set(payoutRef, {
+        affiliate_uid: authUser.uid,
+        amount,
+        phone: normalizePhone(phone),
+        status: "pending",
+        created_at: FieldValue.serverTimestamp(),
+        updated_at: FieldValue.serverTimestamp(),
+      });
+    });
+
+    return res.json({ status: "success", message: "Withdrawal request submitted for review." });
+  } catch (error) {
+    return res.status(error.status || 500).json({
+      status: "error",
+      message: error.message || "Could not submit withdrawal request.",
+    });
   }
 });

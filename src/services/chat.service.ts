@@ -5,8 +5,8 @@ import {
   orderBy,
   query,
 } from "firebase/firestore";
-import Constants from "expo-constants";
 import { firebaseAuth, firestore } from "./firebase";
+import { callFunction, FunctionApiError } from "./functionsApi";
 import {
   FREE_CHAT_LIMIT,
   canUseFreeChats,
@@ -45,40 +45,6 @@ export class ChatLimitError extends Error {
   }
 }
 
-// ── Resolve the Laravel API base URL (same constant as M-Pesa) ──────────────
-type FirebaseExtra = { mpesaApiBaseUrl?: string };
-const extra = (Constants.expoConfig?.extra?.firebase ?? {}) as FirebaseExtra;
-const chatApiBaseUrl =
-  process.env.EXPO_PUBLIC_MPESA_API_BASE_URL ??
-  extra.mpesaApiBaseUrl ??
-  "https://afyasmart-ey9q.onrender.com/api/v1";
-
-// ── Low-level POST helper (mirrors requestLaravelMpesa in mpesa.service.ts) ──
-const requestLaravelChat = async <T>(
-  path: string,
-  body: Record<string, unknown>,
-): Promise<T> => {
-  const firebase_uid = firebaseAuth.currentUser?.uid;
-  if (!firebase_uid) throw new Error("You must be signed in to use chat.");
-
-  const response = await fetch(`${chatApiBaseUrl}${path}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ...body, firebase_uid }),
-  });
-
-  const data = await response.json().catch(() => null);
-
-  if (!response.ok) {
-    if (response.status === 403 && data?.limit_reached) {
-      throw new ChatLimitError();
-    }
-    throw new Error(data?.message ?? "Chat request failed.");
-  }
-
-  return data as T;
-};
-
 // ── Public API ───────────────────────────────────────────────────────────────
 
 const requireUid = () => {
@@ -93,7 +59,6 @@ export const getChatStatus = async (
   void token;
   requireUid();
 
-  // Fall back to local Firestore profile when the Laravel user row doesn't exist yet
   const { getCurrentUserProfile } = await import("./auth.service");
   const user = await getCurrentUserProfile();
   const chatCount = user?.chat_count ?? 0;
@@ -126,13 +91,17 @@ export const sendMessage = async (
     throw new ChatLimitError();
   }
 
-  // Delegate AI reply to the Laravel API (OpenAI key stays on the server)
-  const data = await requestLaravelChat<SendMessageResponse>("/chat/send", {
-    message,
-    history,
-  });
-
-  return data;
+  // Delegate AI reply to the chatSend Cloud Function (OpenAI key stays server-side)
+  try {
+    return await callFunction<SendMessageResponse>("chatSend", {
+      body: { message, history },
+    });
+  } catch (error) {
+    if (error instanceof FunctionApiError && error.status === 403 && error.data?.limit_reached) {
+      throw new ChatLimitError();
+    }
+    throw error;
+  }
 };
 
 export const getChatHistory = async (

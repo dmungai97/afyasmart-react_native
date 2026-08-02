@@ -332,7 +332,7 @@ export default function AdminTransactionsScreen() {
                   </View>
                   <Text style={styles.mobileAmountText}>{formatMoney(p.amount)}</Text>
                 </View>
-                {!p.paid && p.status === "pending" && (
+                {!p.paid && (
                   <View style={styles.mobileActionsRow}>
                     <TouchableOpacity
                       style={[styles.mobileReconcileBtn, { flex: 1 }]}
@@ -349,21 +349,23 @@ export default function AdminTransactionsScreen() {
                         </>
                       )}
                     </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.mobileRejectBtn, { flex: 1 }]}
-                      onPress={() => handleReject(p)}
-                      activeOpacity={0.7}
-                      disabled={reconciling === p.id || rejecting === p.id}
-                    >
-                      {rejecting === p.id ? (
-                        <ActivityIndicator size="small" color="#fff" />
-                      ) : (
-                        <>
-                          <Ionicons name="close-circle-outline" size={14} color="#fff" />
-                          <Text style={styles.reconcileBtnText}>Cancel</Text>
-                        </>
-                      )}
-                    </TouchableOpacity>
+                    {p.status === "pending" && (
+                      <TouchableOpacity
+                        style={[styles.mobileRejectBtn, { flex: 1 }]}
+                        onPress={() => handleReject(p)}
+                        activeOpacity={0.7}
+                        disabled={reconciling === p.id || rejecting === p.id}
+                      >
+                        {rejecting === p.id ? (
+                          <ActivityIndicator size="small" color="#fff" />
+                        ) : (
+                          <>
+                            <Ionicons name="close-circle-outline" size={14} color="#fff" />
+                            <Text style={styles.reconcileBtnText}>Cancel</Text>
+                          </>
+                        )}
+                      </TouchableOpacity>
+                    )}
                   </View>
                 )}
               </View>
@@ -393,7 +395,7 @@ export default function AdminTransactionsScreen() {
                   </View>
                 </View>
                 <View style={{ flex: 1, alignItems: "flex-end", paddingRight: 8 }}>
-                  {!p.paid && p.status === "pending" ? (
+                  {!p.paid ? (
                     <View style={{ flexDirection: "row", gap: 8 }}>
                       <TouchableOpacity
                         style={styles.reconcileTableBtn}
@@ -407,18 +409,20 @@ export default function AdminTransactionsScreen() {
                           <Ionicons name="checkmark-circle-outline" size={18} color={GREEN} />
                         )}
                       </TouchableOpacity>
-                      <TouchableOpacity
-                        style={styles.rejectTableBtn}
-                        onPress={() => handleReject(p)}
-                        activeOpacity={0.7}
-                        disabled={reconciling === p.id || rejecting === p.id}
-                      >
-                        {rejecting === p.id ? (
-                          <ActivityIndicator size="small" color={RED} />
-                        ) : (
-                          <Ionicons name="close-circle-outline" size={18} color={RED} />
-                        )}
-                      </TouchableOpacity>
+                      {p.status === "pending" && (
+                        <TouchableOpacity
+                          style={styles.rejectTableBtn}
+                          onPress={() => handleReject(p)}
+                          activeOpacity={0.7}
+                          disabled={reconciling === p.id || rejecting === p.id}
+                        >
+                          {rejecting === p.id ? (
+                            <ActivityIndicator size="small" color={RED} />
+                          ) : (
+                            <Ionicons name="close-circle-outline" size={18} color={RED} />
+                          )}
+                        </TouchableOpacity>
+                      )}
                     </View>
                   ) : null}
                 </View>

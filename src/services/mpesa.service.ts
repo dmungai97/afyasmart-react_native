@@ -3,11 +3,17 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { doc, serverTimestamp, setDoc } from "firebase/firestore";
 import { firebaseAuth, firestore } from "./firebase";
 import { subscribeUser } from "./subscription.service";
+import { useAuthStore } from "../store/authStore";
 
-const USE_FIREBASE_FUNCTIONS = process.env.EXPO_PUBLIC_USE_FIREBASE_FUNCTIONS === "true";
-
-type FirebaseExtra = { mpesaApiBaseUrl?: string; functionsBaseUrl?: string };
+type FirebaseExtra = {
+  mpesaApiBaseUrl?: string;
+  functionsBaseUrl?: string;
+  useFirebaseFunctions?: boolean;
+};
 const extra = (Constants.expoConfig?.extra?.firebase ?? {}) as FirebaseExtra;
+
+const USE_FIREBASE_FUNCTIONS =
+  process.env.EXPO_PUBLIC_USE_FIREBASE_FUNCTIONS === "true" || extra.useFirebaseFunctions === true;
 
 const mpesaApiBaseUrl = USE_FIREBASE_FUNCTIONS
   ? (process.env.EXPO_PUBLIC_FUNCTIONS_BASE_URL ?? extra.functionsBaseUrl ?? "https://us-central1-afya-smart-377ad.cloudfunctions.net")
@@ -19,6 +25,9 @@ const lastCheckoutKey = "mpesa_last_checkout_request_id";
 const checkoutPlanKey = (checkoutRequestId: string) =>
   `mpesa_checkout_plan:${checkoutRequestId}`;
 
+// Only needed on the legacy Laravel path — Laravel never touches Firestore, so the
+// client has to log payment state itself. On the Firebase Functions path, mpesaInitiate/
+// mpesaStatus already write paymentRequests (and activate subscriptions) server-side.
 const savePaymentRequest = async (
   checkoutRequestId: string,
   data: Record<string, unknown>,
@@ -90,13 +99,16 @@ export const initiateMpesa = async (
   checkoutPlans.set(data.checkout_request_id, plan);
   await AsyncStorage.setItem(lastCheckoutKey, data.checkout_request_id);
   await AsyncStorage.setItem(checkoutPlanKey(data.checkout_request_id), plan);
-  await savePaymentRequest(data.checkout_request_id, {
-    phone,
-    plan,
-    status: "pending",
-    paid: false,
-    created_at: serverTimestamp(),
-  });
+
+  if (!USE_FIREBASE_FUNCTIONS) {
+    await savePaymentRequest(data.checkout_request_id, {
+      phone,
+      plan,
+      status: "pending",
+      paid: false,
+      created_at: serverTimestamp(),
+    });
+  }
 
   return data;
 };
@@ -116,25 +128,29 @@ export const pollMpesaStatus = async (
       checkoutPlans.get(checkoutRequestId) ??
       (await AsyncStorage.getItem(checkoutPlanKey(checkoutRequestId)));
 
-    await savePaymentRequest(checkoutRequestId, {
-      plan: plan ?? null,
-      status: "paid",
-      paid: true,
-      paid_at: serverTimestamp(),
-    });
+    if (USE_FIREBASE_FUNCTIONS) {
+      // mpesaStatus already activated the subscription server-side — just pull
+      // the fresh users/{uid} doc into local state.
+      await useAuthStore.getState().refreshUser(token ?? "");
+    } else {
+      await savePaymentRequest(checkoutRequestId, {
+        plan: plan ?? null,
+        status: "paid",
+        paid: true,
+        paid_at: serverTimestamp(),
+      });
+
+      if (plan) {
+        await subscribeUser(token, plan);
+      }
+    }
 
     if (plan) {
-      await subscribeUser(token, plan);
       checkoutPlans.delete(checkoutRequestId);
       await AsyncStorage.removeItem(lastCheckoutKey);
       await AsyncStorage.removeItem(checkoutPlanKey(checkoutRequestId));
     }
-  } else if (data.status === "cancelled" || data.status === "failed") {
-    await savePaymentRequest(checkoutRequestId, {
-      status: data.status,
-      paid: false,
-    });
-  } else {
+  } else if (!USE_FIREBASE_FUNCTIONS) {
     await savePaymentRequest(checkoutRequestId, {
       status: data.status ?? "pending",
       paid: false,

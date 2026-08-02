@@ -44,7 +44,8 @@
         "googleAndroidClientId": "485330882915-sn8ashjoflvl5ffbnr292kj35gloo1nu.apps.googleusercontent.com",
         "functionsRegion": "us-central1",
         "functionsBaseUrl": "https://us-central1-afya-smart-377ad.cloudfunctions.net",
-        "mpesaApiBaseUrl": "https://afyasmart-ey9q.onrender.com/api/v1"
+        "mpesaApiBaseUrl": "https://afyasmart-ey9q.onrender.com/api/v1",
+        "useFirebaseFunctions": true
       },
       "eas": {
         "projectId": "bbf76662-aebe-40e3-8aff-2f9e3a7eec95"
