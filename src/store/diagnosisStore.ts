@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import type { SymptomsAnalysisRequest } from '@/src/services/symptoms.service';
 
 export type DiagnosisCondition = {
   name: string;
@@ -28,9 +29,12 @@ export type HealthCheckAnswers = {
 type DiagnosisState = {
   pendingDiagnosis: PendingDiagnosis | null;
   healthCheckAnswers: HealthCheckAnswers | null;
+  pendingAnalysisRequest: SymptomsAnalysisRequest | null;
   setPendingDiagnosis: (diagnosis: PendingDiagnosis) => void;
   clearPendingDiagnosis: () => void;
   setHealthCheckAnswers: (answers: HealthCheckAnswers) => void;
+  setPendingAnalysisRequest: (request: SymptomsAnalysisRequest) => void;
+  clearPendingAnalysisRequest: () => void;
 };
 
 export function buildDiagnosisFromSymptoms(symptoms: string): PendingDiagnosis {
@@ -82,7 +86,10 @@ export function buildDiagnosisFromSymptoms(symptoms: string): PendingDiagnosis {
 export const useDiagnosisStore = create<DiagnosisState>((set) => ({
   pendingDiagnosis: null,
   healthCheckAnswers: null,
+  pendingAnalysisRequest: null,
   setPendingDiagnosis: (diagnosis) => set({ pendingDiagnosis: diagnosis }),
   clearPendingDiagnosis: () => set({ pendingDiagnosis: null }),
   setHealthCheckAnswers: (answers) => set({ healthCheckAnswers: answers }),
+  setPendingAnalysisRequest: (request) => set({ pendingAnalysisRequest: request }),
+  clearPendingAnalysisRequest: () => set({ pendingAnalysisRequest: null }),
 }));

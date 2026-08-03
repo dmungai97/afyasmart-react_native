@@ -1,55 +1,116 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { useEffect, useRef } from "react";
-import { Animated, StatusBar, StyleSheet, Text, View } from "react-native";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Animated, StatusBar, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { useDiagnosisStore } from "@/src/store/diagnosisStore";
+import { requestSymptomsAnalysis } from "@/src/services/symptoms.service";
 
 const INK = "#17104F";
 const PURPLE = "#5B2FD6";
 const LIME = "#C8F24A";
 const BG = "#F7F7FB";
+const RED = "#DC2626";
 
 export function AnalysisLoadingScreen() {
   const router = useRouter();
-  const pulse = useRef(new Animated.Value(0.85)).current;
-  const progress = useRef(new Animated.Value(0)).current;
-  const spin = useRef(new Animated.Value(0)).current;
+  const pendingAnalysisRequest = useDiagnosisStore((s) => s.pendingAnalysisRequest);
+  const setPendingDiagnosis = useDiagnosisStore((s) => s.setPendingDiagnosis);
+  const clearPendingAnalysisRequest = useDiagnosisStore((s) => s.clearPendingAnalysisRequest);
 
-  useEffect(() => {
+  const [status, setStatus] = useState<"loading" | "error">("loading");
+  const [errorMessage, setErrorMessage] = useState("");
+
+  const pulse = useRef(new Animated.Value(0.85)).current;
+  const progress = useRef(new Animated.Value(0.08)).current;
+  const spin = useRef(new Animated.Value(0)).current;
+  const crawlRef = useRef<Animated.CompositeAnimation | null>(null);
+
+  const startMotion = useCallback(() => {
     Animated.loop(
       Animated.sequence([
-        Animated.timing(pulse, {
-          toValue: 1.08,
-          duration: 700,
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulse, {
-          toValue: 0.85,
-          duration: 700,
-          useNativeDriver: true,
-        }),
+        Animated.timing(pulse, { toValue: 1.08, duration: 700, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 0.85, duration: 700, useNativeDriver: true }),
       ]),
     ).start();
 
     Animated.loop(
-      Animated.timing(spin, {
-        toValue: 1,
-        duration: 2200,
-        useNativeDriver: true,
-      }),
+      Animated.timing(spin, { toValue: 1, duration: 2200, useNativeDriver: true }),
     ).start();
 
-    Animated.timing(progress, {
-      toValue: 1,
-      duration: 3000,
-      useNativeDriver: false,
-    }).start();
+    // Progress has no way to know real completion percentage, so it creeps
+    // toward — but never reaches — "done" until the request actually resolves.
+    progress.setValue(0.08);
+    const crawl = Animated.sequence([
+      Animated.timing(progress, { toValue: 0.35, duration: 500, useNativeDriver: false }),
+      Animated.timing(progress, { toValue: 0.6, duration: 1200, useNativeDriver: false }),
+      Animated.timing(progress, { toValue: 0.8, duration: 2200, useNativeDriver: false }),
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(progress, { toValue: 0.86, duration: 900, useNativeDriver: false }),
+          Animated.timing(progress, { toValue: 0.8, duration: 900, useNativeDriver: false }),
+        ]),
+      ),
+    ]);
+    crawlRef.current = crawl;
+    crawl.start();
+  }, [pulse, progress, spin]);
 
-    const timer = setTimeout(() => {
-      router.replace("/(onboarding)/locked-results" as any);
-    }, 3300);
+  const stopMotion = useCallback(() => {
+    pulse.stopAnimation();
+    spin.stopAnimation();
+    crawlRef.current?.stop();
+  }, [pulse, spin]);
 
-    return () => clearTimeout(timer);
-  }, [progress, pulse, router, spin]);
+  const runAnalysis = useCallback(async () => {
+    if (!pendingAnalysisRequest) {
+      router.replace("/(onboarding)/symptom-chat" as any);
+      return;
+    }
+
+    setStatus("loading");
+    startMotion();
+
+    try {
+      const data = await requestSymptomsAnalysis(pendingAnalysisRequest);
+
+      const formattedDiagnosis = {
+        symptoms: pendingAnalysisRequest.symptoms.join(", "),
+        summary: data.urgency_desc,
+        urgency: data.urgency,
+        conditions: data.conditions.map((c) => ({
+          name: c.name,
+          probability: c.percent,
+          level: c.likelihood,
+          color: c.color,
+        })),
+        medications: data.medications.map((m) => ({
+          name: m.name,
+          note: m.desc,
+        })),
+        preparedAt: new Date().toISOString(),
+      };
+
+      setPendingDiagnosis(formattedDiagnosis);
+      clearPendingAnalysisRequest();
+
+      stopMotion();
+      Animated.timing(progress, { toValue: 1, duration: 350, useNativeDriver: false }).start(() => {
+        setTimeout(() => {
+          router.replace("/(onboarding)/locked-results" as any);
+        }, 350);
+      });
+    } catch (err: any) {
+      stopMotion();
+      setStatus("error");
+      setErrorMessage(err?.message ?? "Something went wrong while analyzing your symptoms.");
+    }
+  }, [pendingAnalysisRequest, router, setPendingDiagnosis, clearPendingAnalysisRequest, startMotion, stopMotion, progress]);
+
+  useEffect(() => {
+    runAnalysis();
+    return () => stopMotion();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const rotate = spin.interpolate({
     inputRange: [0, 1],
@@ -58,7 +119,7 @@ export function AnalysisLoadingScreen() {
 
   const progressWidth = progress.interpolate({
     inputRange: [0, 1],
-    outputRange: ["10%", "84%"],
+    outputRange: ["0%", "100%"],
   });
 
   return (
@@ -76,27 +137,49 @@ export function AnalysisLoadingScreen() {
       </View>
 
       <View style={styles.body}>
-        <Animated.View
-          style={[
-            styles.analysisOrb,
-            { transform: [{ scale: pulse }, { rotate }] },
-          ]}
-        >
-          <View style={styles.orbCore}>
-            <Ionicons name="medical" size={40} color="#fff" />
-          </View>
-          <View style={[styles.dot, styles.dotOne]} />
-          <View style={[styles.dot, styles.dotTwo]} />
-          <View style={[styles.dot, styles.dotThree]} />
-        </Animated.View>
+        {status === "loading" ? (
+          <>
+            <Animated.View
+              style={[
+                styles.analysisOrb,
+                { transform: [{ scale: pulse }, { rotate }] },
+              ]}
+            >
+              <View style={styles.orbCore}>
+                <Ionicons name="medical" size={40} color="#fff" />
+              </View>
+              <View style={[styles.dot, styles.dotOne]} />
+              <View style={[styles.dot, styles.dotTwo]} />
+              <View style={[styles.dot, styles.dotThree]} />
+            </Animated.View>
 
-        <Text style={styles.title}>I&apos;m analyzing your symptoms...</Text>
-        <Text style={styles.sub}>This may take a few seconds</Text>
+            <Text style={styles.title}>I&apos;m analyzing your symptoms...</Text>
+            <Text style={styles.sub}>This may take a few seconds</Text>
 
-        <View style={styles.progressTrack}>
-          <Animated.View style={[styles.progressFill, { width: progressWidth }]} />
-        </View>
-        <Text style={styles.caption}>Analyzing...</Text>
+            <View style={styles.progressTrack}>
+              <Animated.View style={[styles.progressFill, { width: progressWidth }]} />
+            </View>
+            <Text style={styles.caption}>Analyzing...</Text>
+          </>
+        ) : (
+          <>
+            <View style={[styles.analysisOrb, styles.errorOrb]}>
+              <View style={[styles.orbCore, styles.errorOrbCore]}>
+                <Ionicons name="alert" size={40} color="#fff" />
+              </View>
+            </View>
+
+            <Text style={styles.title}>We couldn&apos;t finish your analysis</Text>
+            <Text style={styles.sub}>{errorMessage}</Text>
+
+            <TouchableOpacity style={styles.retryBtn} onPress={runAnalysis} activeOpacity={0.85}>
+              <Text style={styles.retryBtnText}>Try Again</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => router.back()} activeOpacity={0.7}>
+              <Text style={styles.backLink}>Go back</Text>
+            </TouchableOpacity>
+          </>
+        )}
       </View>
     </View>
   );
@@ -141,6 +224,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginBottom: 44,
   },
+  errorOrb: { backgroundColor: "rgba(220,38,38,0.1)" },
   orbCore: {
     width: 92,
     height: 92,
@@ -149,6 +233,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  errorOrbCore: { backgroundColor: RED },
   dot: {
     position: "absolute",
     width: 12,
@@ -180,4 +265,13 @@ const styles = StyleSheet.create({
     backgroundColor: PURPLE,
   },
   caption: { color: "#5E5A78", fontSize: 12, marginTop: 12 },
+  retryBtn: {
+    backgroundColor: PURPLE,
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 32,
+    marginTop: 4,
+  },
+  retryBtnText: { color: "#fff", fontSize: 14, fontWeight: "800" },
+  backLink: { color: "#5E5A78", fontSize: 13, fontWeight: "600", marginTop: 16 },
 });

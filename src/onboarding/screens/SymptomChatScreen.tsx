@@ -2,13 +2,13 @@ import { useState, useRef, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   StatusBar, ScrollView, KeyboardAvoidingView, Platform,
-  Animated, ActivityIndicator, Keyboard, Alert,
+  Animated, ActivityIndicator, Keyboard,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useDiagnosisStore } from '@/src/store/diagnosisStore';
-import { requestSymptomsAnalysis } from '@/src/services/symptoms.service';
+import type { SymptomsAnalysisRequest } from '@/src/services/symptoms.service';
 
 const TEAL      = '#0B6E6E';
 const TEAL_DARK = '#063D3D';
@@ -46,13 +46,12 @@ const INITIAL_MESSAGES: Message[] = [
 export function SymptomChatScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const setPendingDiagnosis = useDiagnosisStore((s) => s.setPendingDiagnosis);
+  const setPendingAnalysisRequest = useDiagnosisStore((s) => s.setPendingAnalysisRequest);
   const healthCheckAnswers = useDiagnosisStore((s) => s.healthCheckAnswers);
 
   const [messages, setMessages]   = useState<Message[]>(INITIAL_MESSAGES);
   const [input, setInput]         = useState('');
-  const [loading, setLoading]     = useState(false);
-  const [hasSymptoms, setHasSymptoms] = useState(false);
+  const [sending, setSending]     = useState(false);
 
   const scrollRef  = useRef<ScrollView>(null);
   const inputRef   = useRef<TextInput>(null);
@@ -108,73 +107,42 @@ export function SymptomChatScreen() {
     }
   }, [keyboardShown]);
 
-  const sendMessage = async () => {
+  const sendMessage = () => {
     const text = input.trim();
-    if (!text || loading) return;
+    if (!text || sending) return;
 
     setInput('');
-    setHasSymptoms(true);
+    setSending(true);
     setMessages((prev) => [...prev, { role: 'user', text }]);
-
-    setLoading(true);
     startDots();
     setMessages((prev) => [...prev, { role: 'assistant', text: '', typing: true }]);
 
-    try {
-      const data = await requestSymptomsAnalysis({
-        symptoms: [text],
-        age: AGE_GROUP_TO_AGE[healthCheckAnswers?.age ?? ''] ?? 25,
-        gender: 'other',
-        duration: '1-3 days',
-        severity: FEELING_TO_SEVERITY[healthCheckAnswers?.feeling ?? ''] ?? 'Moderate',
-        answers: healthCheckAnswers?.concern ? { concern: healthCheckAnswers.concern } : {},
-      });
+    const request: SymptomsAnalysisRequest = {
+      symptoms: [text],
+      age: AGE_GROUP_TO_AGE[healthCheckAnswers?.age ?? ''] ?? 25,
+      gender: 'other',
+      duration: '1-3 days',
+      severity: FEELING_TO_SEVERITY[healthCheckAnswers?.feeling ?? ''] ?? 'Moderate',
+      answers: healthCheckAnswers?.concern ? { concern: healthCheckAnswers.concern } : {},
+    };
+    setPendingAnalysisRequest(request);
 
-      const formattedDiagnosis = {
-        symptoms: text,
-        summary: data.urgency_desc,
-        urgency: data.urgency,
-        conditions: data.conditions.map(c => ({
-          name: c.name,
-          probability: c.percent,
-          level: c.likelihood,
-          color: c.color,
-        })),
-        medications: data.medications.map(m => ({
-          name: m.name,
-          note: m.desc,
-        })),
-        preparedAt: new Date().toISOString(),
-      };
-
-      setPendingDiagnosis(formattedDiagnosis);
-      const topCondition = formattedDiagnosis.conditions[0]?.name ?? 'a possible health concern';
-
+    // Brief typing beat before handing off — the actual analysis runs on the
+    // next screen, so this message can't claim findings it doesn't have yet.
+    setTimeout(() => {
+      stopDots();
       setMessages((prev) => {
         const without = prev.filter((m) => !m.typing);
         return [...without, {
           role: 'assistant',
-          text:
-            `I found patterns that may relate to ${topCondition}.\n\n` +
-            "I'm preparing your full report now: possible causes, urgency level, treatment advice, and nearby care options.",
+          text: "Got it — let me analyze that for you now.",
         }];
       });
 
-      stopDots();
-      setLoading(false);
-
       setTimeout(() => {
         router.push('/(onboarding)/analysis-loading' as any);
-      }, 1200);
-    } catch (err: any) {
-      stopDots();
-      setLoading(false);
-      setMessages((prev) => prev.filter((m) => !m.typing));
-      Alert.alert(
-        "Analysis Limited",
-        err?.message ?? "An error occurred while analyzing symptoms. Please try again."
-      );
-    }
+      }, 700);
+    }, 500);
   };
 
   const inputBottomPadding = keyboardShown ? 12 : Math.max(insets.bottom, 8) + 12;
@@ -245,16 +213,6 @@ export function SymptomChatScreen() {
             )}
           </View>
         ))}
-
-        {hasSymptoms && !loading && (
-          <View style={styles.teaserHint}>
-            <Ionicons name="lock-closed" size={14} color={TEAL} />
-            <Text style={styles.teaserHintText}>
-              Preparing your full diagnosis report...
-            </Text>
-            <ActivityIndicator size="small" color={TEAL} />
-          </View>
-        )}
       </ScrollView>
 
       {/* Input */}
@@ -268,7 +226,7 @@ export function SymptomChatScreen() {
           placeholderTextColor="#aaa"
           multiline
           maxLength={500}
-          editable={!loading}
+          editable={!sending}
           onSubmitEditing={sendMessage}
           returnKeyType="send"
           onFocus={() => {
@@ -278,12 +236,12 @@ export function SymptomChatScreen() {
           onBlur={() => setKeyboardShown(false)}
         />
         <TouchableOpacity
-          style={[styles.sendBtn, (!input.trim() || loading) && styles.sendBtnDisabled]}
+          style={[styles.sendBtn, (!input.trim() || sending) && styles.sendBtnDisabled]}
           onPress={sendMessage}
-          disabled={!input.trim() || loading}
+          disabled={!input.trim() || sending}
           activeOpacity={0.8}
         >
-          {loading
+          {sending
             ? <ActivityIndicator size="small" color="#fff" />
             : <Ionicons name="send" size={18} color="#fff" />
           }
@@ -345,12 +303,6 @@ const styles = StyleSheet.create({
     width: 8, height: 8, borderRadius: 4,
     backgroundColor: TEAL, opacity: 0.7,
   },
-  teaserHint: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: '#E0F0F0', borderRadius: 12, padding: 12,
-    marginTop: 4, alignSelf: 'center',
-  },
-  teaserHintText: { color: TEAL, fontSize: 12, fontWeight: '600', flex: 1 },
   inputRow: {
     flexDirection: 'row', alignItems: 'flex-end', gap: 10,
     paddingHorizontal: 16, paddingVertical: 12,
