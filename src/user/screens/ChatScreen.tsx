@@ -7,7 +7,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
-import { addDoc, collection, doc, serverTimestamp, updateDoc } from 'firebase/firestore';
+import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { firebaseAuth, firestore } from '@/src/services/firebase';
 import { useAuthStore } from '@/src/store/authStore';
 import {
@@ -249,16 +249,14 @@ export function ChatScreen() {
         remaining:     Math.max(0, data.limit - data.chat_count),
       } : prev);
 
-      // ── Persist exchange to Firestore so history & count stay in sync ──
+      // ── Persist exchange to Firestore for chat history ──
+      // chat_count is already incremented server-side by the chatSend Cloud
+      // Function (Admin SDK) — Firestore rules block clients from writing it.
       const uid = firebaseAuth.currentUser?.uid;
       if (uid) {
         const messagesRef = collection(firestore, 'users', uid, 'chatMessages');
         await addDoc(messagesRef, { role: 'user', text: userMessage, created_at: serverTimestamp() });
         await addDoc(messagesRef, { role: 'ai',  text: data.reply,   created_at: serverTimestamp() });
-        await updateDoc(doc(firestore, 'users', uid), {
-          chat_count: data.chat_count,
-          updated_at: serverTimestamp(),
-        });
       }
     } catch (err) {
       if (err instanceof ChatLimitError) {

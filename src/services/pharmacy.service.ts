@@ -8,6 +8,12 @@ const numericId = (id: string, index = 0) => {
   return Number.isFinite(parsed) ? parsed : index + 1;
 };
 
+// Firestore rejects pharmacies reads for non-subscribers (see hasActiveSubscription()
+// in firestore.rules) — that denial must propagate as an error, not be swallowed
+// into the bundled seed data below, or the paywall does nothing.
+const isPermissionDenied = (error: unknown) =>
+  (error as { code?: string } | null)?.code === "permission-denied";
+
 const mapPharmacy = (id: string, data: any, index = 0) => ({
   id: numericId(id, index),
   name: data.name ?? "",
@@ -22,6 +28,13 @@ const mapPharmacy = (id: string, data: any, index = 0) => ({
   open: Boolean(data.open),
 });
 
+// Local-only, unauthenticated pharmacy list — used by screens (e.g. the map)
+// that intentionally show generic seeded data to everyone regardless of
+// subscription. Never route this through anything that also serves the
+// paywalled directory (getPharmacies below).
+export const fetchSeededPharmacies = () =>
+  seededPharmacies.map((item, index) => mapPharmacy(String(index + 1), item, index));
+
 export const getPharmacies = async (token: string, search?: string) => {
   void token;
   let data: ReturnType<typeof mapPharmacy>[] = [];
@@ -30,14 +43,13 @@ export const getPharmacies = async (token: string, search?: string) => {
     data = snap.docs.map((item, index) =>
       mapPharmacy(item.id, item.data(), index),
     );
-  } catch {
+  } catch (error) {
+    if (isPermissionDenied(error)) throw error;
     data = [];
   }
 
   if (data.length === 0) {
-    data = seededPharmacies.map((item, index) =>
-      mapPharmacy(String(index + 1), item, index),
-    );
+    data = fetchSeededPharmacies();
   }
 
   const query = search?.toLowerCase().trim();

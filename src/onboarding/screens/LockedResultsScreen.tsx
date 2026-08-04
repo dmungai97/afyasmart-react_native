@@ -7,21 +7,24 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useDiagnosisStore } from '@/src/store/diagnosisStore';
 import { useAuthStore } from '@/src/store/authStore';
-
-const TEAL       = '#0B6E6E';
-const TEAL_DARK  = '#063D3D';
-const BG         = '#F0F7F7';
+import { PAPER, INK, INK_MUTED, INK_FAINT, ACCENT, RULE, SUCCESS, WARNING, DANGER } from '../theme';
 
 const FALLBACK_CONDITIONS = [
-  { icon: 'fitness-outline',   severity: 'Medium', color: '#F59E0B' },
-  { icon: 'thermometer-outline', severity: 'High',   color: '#EF4444' },
-  { icon: 'bandage-outline',   severity: 'Low',    color: '#22C55E' },
+  { icon: 'fitness-outline',     severity: 'Medium', color: WARNING },
+  { icon: 'thermometer-outline', severity: 'High',   color: DANGER  },
+  { icon: 'bandage-outline',     severity: 'Low',     color: SUCCESS },
 ];
 
 const SEVERITY_ICON: Record<string, string> = {
   High: 'thermometer-outline',
   Medium: 'fitness-outline',
   Low: 'bandage-outline',
+};
+
+const SEVERITY_COLOR: Record<string, string> = {
+  High: DANGER,
+  Medium: WARNING,
+  Low: SUCCESS,
 };
 
 const UNLOCK_FEATURES = [
@@ -33,9 +36,9 @@ const UNLOCK_FEATURES = [
 ];
 
 const PLANS = [
-  { id: 'daily',   label: 'Daily',   price: 'Ksh 20',  badge: 'Most Popular', badgeColor: '#22C55E' },
-  { id: 'weekly',  label: 'Weekly',  price: 'Ksh 100', badge: 'Save 30%',     badgeColor: TEAL      },
-  { id: 'monthly', label: 'Monthly', price: 'Ksh 200', badge: 'Best Value',   badgeColor: '#7C3AED' },
+  { id: 'daily',   label: 'Daily',   price: 'Ksh 20',  badge: 'Most Popular' },
+  { id: 'weekly',  label: 'Weekly',  price: 'Ksh 100', badge: 'Save 30%'     },
+  { id: 'monthly', label: 'Monthly', price: 'Ksh 200', badge: 'Best Value'   },
 ];
 
 export function LockedResultsScreen() {
@@ -53,7 +56,7 @@ export function LockedResultsScreen() {
     ? diagnosis.conditions.map((c) => ({
         icon: SEVERITY_ICON[c.level] ?? 'fitness-outline',
         severity: c.level,
-        color: c.color,
+        color: SEVERITY_COLOR[c.level] ?? WARNING,
       }))
     : FALLBACK_CONDITIONS;
 
@@ -72,8 +75,8 @@ export function LockedResultsScreen() {
 
     Animated.loop(
       Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 1.15, duration: 800, useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 1,    duration: 800, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1.1, duration: 800, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1,   duration: 800, useNativeDriver: true }),
       ])
     ).start();
 
@@ -105,7 +108,7 @@ export function LockedResultsScreen() {
 
   return (
     <View style={styles.root}>
-      <StatusBar barStyle="dark-content" backgroundColor={BG} />
+      <StatusBar barStyle="light-content" backgroundColor={INK} />
 
       <ScrollView
         contentContainerStyle={styles.scroll}
@@ -114,9 +117,9 @@ export function LockedResultsScreen() {
         {/* Top banner */}
         <Animated.View style={[styles.banner, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
           <Animated.View style={[styles.lockCircle, { transform: [{ scale: pulseAnim }, { translateX: shakeAnim }] }]}>
-            <Ionicons name="lock-closed" size={32} color="#fff" />
+            <Ionicons name="lock-closed-outline" size={30} color={PAPER} />
           </Animated.View>
-          <Text style={styles.bannerTitle}>Analysis Complete ✅</Text>
+          <Text style={styles.bannerTitle}>Analysis Complete</Text>
           <Text style={styles.bannerSub}>
             We found <Text style={styles.bannerHighlight}>{diagnosis?.conditions.length ?? 3} possible conditions</Text> related to your symptoms
           </Text>
@@ -125,41 +128,42 @@ export function LockedResultsScreen() {
         {/* Locked conditions */}
         <Animated.View style={[styles.section, { opacity: fadeAnim }]}>
           <Text style={styles.sectionTitle}>Your Results</Text>
-          {displayConditions.map((c, i) => (
-            <View key={i} style={styles.conditionCard}>
-              <View style={styles.conditionLeft}>
-                <View style={[styles.conditionIconBg, { backgroundColor: c.color + '20' }]}>
-                  <Ionicons name={c.icon as any} size={20} color={c.color} />
+          <View style={styles.ruleList}>
+            {displayConditions.map((c, i) => (
+              <View key={i} style={styles.conditionRow}>
+                <View style={styles.conditionLeft}>
+                  <View style={[styles.conditionRule, { backgroundColor: c.color }]} />
+                  <Ionicons name={c.icon as any} size={18} color={c.color} style={{ marginRight: 10 }} />
+                  <View style={styles.conditionInfo}>
+                    <View style={styles.conditionBlurBar} />
+                    <View style={[styles.conditionBlurBar, { width: '60%', marginTop: 6 }]} />
+                  </View>
                 </View>
-                <View style={styles.conditionInfo}>
-                  <View style={styles.conditionBlurBar} />
-                  <View style={[styles.conditionBlurBar, { width: '60%', marginTop: 6 }]} />
+                <View style={styles.conditionLockChip}>
+                  <Ionicons name="lock-closed-outline" size={11} color={INK_FAINT} />
+                  <Text style={styles.conditionLockText}>Locked</Text>
                 </View>
               </View>
-              <View style={styles.conditionLockChip}>
-                <Ionicons name="lock-closed" size={11} color="#999" />
-                <Text style={styles.conditionLockText}>Locked</Text>
-              </View>
-            </View>
-          ))}
+            ))}
+          </View>
 
           {/* Urgency row — blurred */}
           <View style={styles.urgencyRow}>
-            <Ionicons name="alert-circle" size={16} color="#F59E0B" />
+            <Ionicons name="alert-circle-outline" size={16} color={ACCENT} />
             <Text style={styles.urgencyLabel}>Urgency Level:</Text>
             <View style={styles.urgencyBlur} />
-            <Ionicons name="lock-closed" size={12} color="#ccc" />
+            <Ionicons name="lock-closed-outline" size={12} color={INK_FAINT} />
           </View>
         </Animated.View>
 
         {/* What you unlock */}
         <Animated.View style={[styles.section, { opacity: fadeAnim }]}>
           <Text style={styles.sectionTitle}>Unlock Full Results</Text>
-          <View style={styles.featuresCard}>
+          <View style={styles.ruleList}>
             {UNLOCK_FEATURES.map((f, i) => (
               <View key={i} style={styles.featureRow}>
                 <View style={styles.featureCheck}>
-                  <Ionicons name="checkmark" size={13} color="#fff" />
+                  <Ionicons name="checkmark" size={13} color={PAPER} />
                 </View>
                 <Text style={styles.featureText}>{f.text}</Text>
               </View>
@@ -178,52 +182,57 @@ export function LockedResultsScreen() {
         {/* Plans */}
         <Animated.View style={[styles.section, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
           <Text style={styles.sectionTitle}>Choose a Plan</Text>
-          {PLANS.map((plan) => (
-            <TouchableOpacity
-              key={plan.id}
-              style={[
-                styles.planCard,
-                plan.id === 'daily' && styles.planCardFeatured,
-              ]}
-              onPress={() => handleSubscribe(plan.id)}
-              activeOpacity={0.82}
-            >
-              <View style={styles.planLeft}>
-                <View style={styles.planLabelRow}>
-                  <Text style={[
-                    styles.planLabel,
-                    plan.id === 'daily' && styles.planLabelFeatured,
-                  ]}>
-                    {plan.label}
-                  </Text>
-                  <View style={[styles.planBadge, { backgroundColor: plan.badgeColor + '20' }]}>
-                    <Text style={[styles.planBadgeText, { color: plan.badgeColor }]}>
-                      {plan.badge}
+          <View style={styles.ruleList}>
+            {PLANS.map((plan) => (
+              <TouchableOpacity
+                key={plan.id}
+                style={[
+                  styles.planRow,
+                  plan.id === 'daily' && styles.planRowFeatured,
+                ]}
+                onPress={() => handleSubscribe(plan.id)}
+                activeOpacity={0.82}
+              >
+                <View style={styles.planLeft}>
+                  <View style={styles.planLabelRow}>
+                    <Text style={[
+                      styles.planLabel,
+                      plan.id === 'daily' && styles.planLabelFeatured,
+                    ]}>
+                      {plan.label}
                     </Text>
+                    <View style={styles.planBadge}>
+                      <Text style={[
+                        styles.planBadgeText,
+                        plan.id === 'daily' && styles.planBadgeTextFeatured,
+                      ]}>
+                        {plan.badge}
+                      </Text>
+                    </View>
                   </View>
+                  <Text style={[
+                    styles.planNote,
+                    plan.id === 'daily' && styles.planNoteFeatured,
+                  ]}>
+                    Full access · Cancel anytime
+                  </Text>
                 </View>
-                <Text style={[
-                  styles.planNote,
-                  plan.id === 'daily' && styles.planNoteFeatured,
-                ]}>
-                  Full access · Cancel anytime
-                </Text>
-              </View>
-              <View style={styles.planRight}>
-                <Text style={[
-                  styles.planPrice,
-                  plan.id === 'daily' && styles.planPriceFeatured,
-                ]}>
-                  {plan.price}
-                </Text>
-                <Ionicons
-                  name="arrow-forward-circle"
-                  size={22}
-                  color={plan.id === 'daily' ? '#fff' : TEAL}
-                />
-              </View>
-            </TouchableOpacity>
-          ))}
+                <View style={styles.planRight}>
+                  <Text style={[
+                    styles.planPrice,
+                    plan.id === 'daily' && styles.planPriceFeatured,
+                  ]}>
+                    {plan.price}
+                  </Text>
+                  <Ionicons
+                    name="arrow-forward"
+                    size={18}
+                    color={plan.id === 'daily' ? PAPER : INK}
+                  />
+                </View>
+              </TouchableOpacity>
+            ))}
+          </View>
         </Animated.View>
 
         {/* Footer note */}
@@ -237,94 +246,91 @@ export function LockedResultsScreen() {
 }
 
 const styles = StyleSheet.create({
-  root:   { flex: 1, backgroundColor: BG },
+  root:   { flex: 1, backgroundColor: PAPER },
   scroll: { paddingBottom: 48 },
   banner: {
-    backgroundColor: TEAL_DARK, alignItems: 'center',
+    backgroundColor: INK, alignItems: 'center',
     paddingTop: 60, paddingBottom: 32, paddingHorizontal: 24,
     gap: 12,
   },
   lockCircle: {
-    width: 72, height: 72, borderRadius: 36,
-    backgroundColor: 'rgba(255,255,255,0.15)',
+    width: 68, height: 68, borderRadius: 34,
     alignItems: 'center', justifyContent: 'center',
-    borderWidth: 2, borderColor: 'rgba(255,255,255,0.25)',
+    borderWidth: 1, borderColor: 'rgba(238,241,234,0.35)',
   },
-  bannerTitle:     { color: '#fff', fontSize: 22, fontWeight: '900' },
-  bannerSub:       { color: 'rgba(255,255,255,0.7)', fontSize: 14, textAlign: 'center', lineHeight: 22 },
-  bannerHighlight: { color: '#4ADE80', fontWeight: '800' },
-  section:      { paddingHorizontal: 20, paddingTop: 24, gap: 12 },
-  sectionTitle: { color: TEAL_DARK, fontSize: 16, fontWeight: '800', marginBottom: 4 },
-  conditionCard: {
-    backgroundColor: '#fff', borderRadius: 14, padding: 16,
+  bannerTitle:     { color: PAPER, fontSize: 21, fontWeight: '600' },
+  bannerSub:       { color: 'rgba(238,241,234,0.7)', fontSize: 14, textAlign: 'center', lineHeight: 22 },
+  bannerHighlight: { color: ACCENT, fontWeight: '600' },
+  section:      { paddingHorizontal: 20, paddingTop: 24 },
+  sectionTitle: { color: INK, fontSize: 15, fontWeight: '600', marginBottom: 10 },
+  ruleList: {
+    borderTopWidth: 1,
+    borderTopColor: RULE,
+  },
+  conditionRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05, shadowRadius: 4, elevation: 2,
+    paddingVertical: 14,
+    borderBottomWidth: 1, borderBottomColor: RULE,
   },
-  conditionLeft:  { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
-  conditionIconBg: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  conditionLeft:  { flexDirection: 'row', alignItems: 'center', flex: 1 },
+  conditionRule:  { width: 2, height: 20, marginRight: 12 },
   conditionInfo:  { flex: 1 },
   conditionBlurBar: {
-    height: 10, backgroundColor: '#E5E5E5',
-    borderRadius: 5, width: '80%',
+    height: 10, backgroundColor: RULE,
+    width: '80%',
   },
   conditionLockChip: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: '#F5F5F5', paddingHorizontal: 10, paddingVertical: 5,
-    borderRadius: 20,
   },
-  conditionLockText: { color: '#999', fontSize: 11, fontWeight: '600' },
+  conditionLockText: { color: INK_FAINT, fontSize: 11, fontWeight: '600' },
   urgencyRow: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: '#FFF9EC', borderRadius: 10, padding: 12,
-    borderWidth: 1, borderColor: '#FDE68A',
+    paddingVertical: 14,
+    borderBottomWidth: 1, borderBottomColor: RULE,
   },
-  urgencyLabel: { color: '#92400E', fontSize: 13, fontWeight: '600' },
-  urgencyBlur:  { flex: 1, height: 10, backgroundColor: '#FDE68A', borderRadius: 5, opacity: 0.6 },
-  featuresCard: {
-    backgroundColor: '#fff', borderRadius: 14, padding: 16, gap: 12,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05, shadowRadius: 4, elevation: 2,
+  urgencyLabel: { color: INK_MUTED, fontSize: 13, fontWeight: '600' },
+  urgencyBlur:  { flex: 1, height: 10, backgroundColor: RULE },
+  featureRow:  {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingVertical: 12,
+    borderBottomWidth: 1, borderBottomColor: RULE,
   },
-  featureRow:  { flexDirection: 'row', alignItems: 'center', gap: 12 },
   featureCheck: {
-    width: 22, height: 22, borderRadius: 11,
-    backgroundColor: TEAL, alignItems: 'center', justifyContent: 'center',
+    width: 20, height: 20, borderRadius: 10,
+    backgroundColor: INK, alignItems: 'center', justifyContent: 'center',
   },
-  featureText: { color: '#444', fontSize: 13, flex: 1, lineHeight: 20 },
+  featureText: { color: INK_MUTED, fontSize: 13, flex: 1, lineHeight: 20 },
   hookBanner: {
-    marginHorizontal: 20, marginTop: 20,
-    backgroundColor: '#FFF3CD', borderRadius: 14,
-    padding: 16, alignItems: 'center', gap: 6,
-    borderWidth: 1, borderColor: '#FDE68A',
+    marginHorizontal: 20, marginTop: 24,
+    paddingVertical: 16, alignItems: 'center', gap: 6,
+    borderTopWidth: 1, borderBottomWidth: 1, borderColor: RULE,
   },
-  hookText: { color: '#92400E', fontSize: 14, fontWeight: '800', textAlign: 'center' },
-  hookSub:  { color: '#A16207', fontSize: 12, textAlign: 'center' },
-  planCard: {
-    backgroundColor: '#fff', borderRadius: 14,
-    padding: 16, flexDirection: 'row',
+  hookText: { color: INK, fontSize: 14, fontWeight: '600', textAlign: 'center' },
+  hookSub:  { color: INK_FAINT, fontSize: 12, textAlign: 'center' },
+  planRow: {
+    paddingVertical: 16, flexDirection: 'row',
     alignItems: 'center', justifyContent: 'space-between',
-    borderWidth: 2, borderColor: 'transparent',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05, shadowRadius: 4, elevation: 2,
+    borderBottomWidth: 1, borderBottomColor: RULE,
   },
-  planCardFeatured: {
-    backgroundColor: TEAL_DARK,
-    borderColor: '#4ADE80',
+  planRowFeatured: {
+    backgroundColor: INK,
+    marginHorizontal: -20, paddingHorizontal: 20,
+    borderBottomColor: INK,
   },
   planLeft:       { flex: 1, gap: 4 },
   planLabelRow:   { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  planLabel:      { color: TEAL_DARK, fontSize: 16, fontWeight: '800' },
-  planLabelFeatured: { color: '#fff' },
-  planBadge:      { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
-  planBadgeText:  { fontSize: 10, fontWeight: '700' },
-  planNote:       { color: '#999', fontSize: 11 },
-  planNoteFeatured: { color: 'rgba(255,255,255,0.5)' },
+  planLabel:      { color: INK, fontSize: 15, fontWeight: '600' },
+  planLabelFeatured: { color: PAPER },
+  planBadge:      { paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: ACCENT, borderRadius: 20 },
+  planBadgeText:  { fontSize: 10, fontWeight: '600', color: ACCENT },
+  planBadgeTextFeatured: { color: ACCENT },
+  planNote:       { color: INK_FAINT, fontSize: 11 },
+  planNoteFeatured: { color: 'rgba(238,241,234,0.55)' },
   planRight:      { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  planPrice:      { color: TEAL_DARK, fontSize: 18, fontWeight: '900' },
-  planPriceFeatured: { color: '#4ADE80' },
+  planPrice:      { color: INK, fontSize: 17, fontWeight: '600' },
+  planPriceFeatured: { color: ACCENT },
   footerNote: {
-    color: '#aaa', fontSize: 11, textAlign: 'center',
-    marginTop: 20, paddingHorizontal: 24,
+    color: INK_FAINT, fontSize: 11, textAlign: 'center',
+    marginTop: 24, paddingHorizontal: 24,
   },
 });

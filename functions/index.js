@@ -628,6 +628,141 @@ exports.symptomsAnalyze = onRequest(
   },
 );
 
+// Bridges the "chat" feel of the onboarding symptom intake with a real,
+// content-aware follow-up question — as opposed to always asking the same
+// fixed duration/gender questions regardless of what the user typed. Capped
+// at two AI-generated questions (enforced below) so this can't turn into an
+// open-ended, open-endedly-billed conversation; gender is intentionally never
+// asked here since it's collected as a fixed question by the client.
+exports.symptomsClarify = onRequest(
+  { region: REGION, cors: true, secrets: [OPENAI_API_KEY] },
+  async (req, res) => {
+    if (sendCors(req, res)) return;
+
+    try {
+      if (req.method !== "POST") {
+        return res.status(405).json({ status: "error", message: "Method not allowed" });
+      }
+
+      const { firebase_uid, symptom, age, severity, history } = req.body || {};
+
+      if (!firebase_uid || typeof firebase_uid !== "string" || !symptom || typeof symptom !== "string") {
+        return res.status(422).json({ status: "error", message: "Missing required fields." });
+      }
+
+      const priorQA = Array.isArray(history) ? history.slice(0, 2) : [];
+
+      if (priorQA.length >= 2) {
+        return res.json({ status: "success", data: { done: true } });
+      }
+
+      // This endpoint deliberately skips auth (guest onboarding needs it
+      // before an account exists), so without a quota anyone could call it
+      // directly with an arbitrary uid and run up unbounded OpenAI cost. Cap
+      // it like symptomsAnalyze's free-check limit — twice as many calls,
+      // since one analysis can involve up to two clarify round-trips.
+      const userSnap = await db.collection("users").doc(firebase_uid).get();
+      const user = userSnap.exists ? userSnap.data() : {};
+      if (!isSubscribed(user)) {
+        const today = new Date().toISOString().slice(0, 10);
+        const quotaRef = db.collection("symptomClarifyChecks").doc(`${firebase_uid}_${today}`);
+        const quotaSnap = await quotaRef.get();
+        const checksToday = quotaSnap.exists ? quotaSnap.data().count || 0 : 0;
+
+        if (checksToday >= SYMPTOM_FREE_DAILY_LIMIT * 2) {
+          return res.json({ status: "success", data: { done: true } });
+        }
+
+        await quotaRef.set(
+          { count: checksToday + 1, updated_at: FieldValue.serverTimestamp() },
+          { merge: true },
+        );
+      }
+
+      const openaiKey = OPENAI_API_KEY.value();
+      if (!openaiKey) {
+        return res.json({ status: "success", data: { done: true } });
+      }
+
+      const historyText = priorQA.length
+        ? priorQA.map((qa, i) => `Q${i + 1}: ${qa.question}\nA${i + 1}: ${qa.answer}`).join("\n")
+        : "(none yet)";
+
+      const prompt =
+        "A patient described this symptom during intake:\n" +
+        `"${symptom}"\n\n` +
+        `Age: ${age ?? "unknown"}, self-reported severity: ${severity ?? "unknown"}\n\n` +
+        `Follow-up questions already asked this session:\n${historyText}\n\n` +
+        "Decide if ONE more short clarifying question would meaningfully help a doctor " +
+        "(e.g. specific location, what makes it better or worse, associated symptoms, how " +
+        "long it's lasted). If you already have enough to proceed, stop.";
+
+      try {
+        const response = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${openaiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "gpt-4o-mini",
+            max_tokens: 300,
+            temperature: 0.4,
+            response_format: { type: "json_object" },
+            messages: [
+              {
+                role: "system",
+                content:
+                  "You are a medical intake assistant narrowing down a symptom description " +
+                  "before a doctor-style analysis. Return raw JSON only, no other text.\n\n" +
+                  "JSON SCHEMA:\n" +
+                  "{\n" +
+                  '  "done": boolean,\n' +
+                  '  "question": "short clarifying question, present only if done is false",\n' +
+                  '  "options": ["3 to 4 short tappable answers, present only if done is false"],\n' +
+                  "  \"duration\": \"best estimate of how long the symptom has lasted, one of " +
+                  "'Today', '1-3 days', '4-7 days', 'Longer than a week', or 'Not specified' if " +
+                  "unclear — always present regardless of done\"\n" +
+                  "}\n" +
+                  "Keep questions and options under 6 words each. Never ask about gender — that " +
+                  "is collected separately.",
+              },
+              { role: "user", content: prompt },
+            ],
+          }),
+        });
+
+        if (!response.ok) {
+          console.error("OpenAI symptomsClarify failed", { status: response.status });
+          return res.json({ status: "success", data: { done: true } });
+        }
+
+        const data = await response.json();
+        const jsonData = JSON.parse(data.choices?.[0]?.message?.content || "null");
+
+        if (!jsonData || typeof jsonData.done !== "boolean") {
+          console.warn("OpenAI symptomsClarify returned invalid JSON structure");
+          return res.json({ status: "success", data: { done: true } });
+        }
+
+        if (!jsonData.done && (!jsonData.question || !Array.isArray(jsonData.options) || jsonData.options.length === 0)) {
+          // Malformed "ask a question" response — fail safe to done rather
+          // than show a broken chip row.
+          return res.json({ status: "success", data: { done: true, duration: jsonData.duration } });
+        }
+
+        return res.json({ status: "success", data: jsonData });
+      } catch (err) {
+        console.error("symptomsClarify OpenAI request failed", err);
+        return res.json({ status: "success", data: { done: true } });
+      }
+    } catch (error) {
+      console.error("symptomsClarify failed", error);
+      return res.json({ status: "success", data: { done: true } });
+    }
+  },
+);
+
 exports.mpesaInitiate = onRequest(
   { region: REGION, cors: true, secrets: mpesaSecrets },
   async (req, res) => {

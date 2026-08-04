@@ -8,11 +8,9 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useDiagnosisStore } from '@/src/store/diagnosisStore';
+import { requestSymptomsClarification } from '@/src/services/symptoms.service';
 import type { SymptomsAnalysisRequest } from '@/src/services/symptoms.service';
-
-const TEAL      = '#0B6E6E';
-const TEAL_DARK = '#063D3D';
-const BG        = '#F0F7F7';
+import { PAPER, INK, INK_FAINT, ACCENT, RULE, RULE_STRONG, SUCCESS } from '../theme';
 
 const AGE_GROUP_TO_AGE: Record<string, number> = {
   'Under 18': 16,
@@ -30,11 +28,25 @@ const FEELING_TO_SEVERITY: Record<string, string> = {
   'Great': 'Mild',
 };
 
+const DURATION_OPTIONS = ['Today', '1-3 days', '4-7 days', 'Longer than a week'];
+
+const GENDER_OPTIONS: { label: string; value: string }[] = [
+  { label: 'Female', value: 'female' },
+  { label: 'Male', value: 'male' },
+  { label: 'Prefer not to say', value: 'other' },
+];
+
 type Message = {
   role:    'assistant' | 'user';
   text:    string;
   typing?: boolean;
 };
+
+// 'clarify' is a real AI-generated follow-up question (content depends on
+// what the user typed, via requestSymptomsClarification) — capped at two
+// rounds server-side. 'duration' is a fixed fallback used only if the AI
+// clarify step is unavailable, so a duration always gets collected either way.
+type Stage = 'symptom' | 'clarify' | 'duration' | 'gender' | 'done';
 
 const INITIAL_MESSAGES: Message[] = [
   {
@@ -52,6 +64,12 @@ export function SymptomChatScreen() {
   const [messages, setMessages]   = useState<Message[]>(INITIAL_MESSAGES);
   const [input, setInput]         = useState('');
   const [sending, setSending]     = useState(false);
+  const [stage, setStage]         = useState<Stage>('symptom');
+  const [symptomText, setSymptomText] = useState('');
+  const [durationAnswer, setDurationAnswer] = useState<string | null>(null);
+  const [clarifyHistory, setClarifyHistory] = useState<{ question: string; answer: string }[]>([]);
+  const [currentQuestion, setCurrentQuestion] = useState<string | null>(null);
+  const [currentOptions, setCurrentOptions] = useState<string[]>([]);
 
   const scrollRef  = useRef<ScrollView>(null);
   const inputRef   = useRef<TextInput>(null);
@@ -107,42 +125,132 @@ export function SymptomChatScreen() {
     }
   }, [keyboardShown]);
 
-  const sendMessage = () => {
-    const text = input.trim();
-    if (!text || sending) return;
+  const pushTypingThen = (next: () => void, delay = 500) => {
+    startDots();
+    setMessages((prev) => [...prev, { role: 'assistant', text: '', typing: true }]);
+    setTimeout(() => {
+      stopDots();
+      setMessages((prev) => prev.filter((m) => !m.typing));
+      next();
+    }, delay);
+  };
 
-    setInput('');
-    setSending(true);
-    setMessages((prev) => [...prev, { role: 'user', text }]);
+  // Shows a typing bubble, asks the AI whether one more clarifying question
+  // is worth asking about this specific symptom, and either shows that
+  // question (stage 'clarify') or moves on. If the AI clarify call is
+  // unavailable, it fails safe to the fixed duration chips so a duration is
+  // always collected somehow.
+  const runClarifyStep = async (
+    symptom: string,
+    history: { question: string; answer: string }[],
+  ) => {
     startDots();
     setMessages((prev) => [...prev, { role: 'assistant', text: '', typing: true }]);
 
-    const request: SymptomsAnalysisRequest = {
-      symptoms: [text],
+    const result = await requestSymptomsClarification({
+      symptom,
       age: AGE_GROUP_TO_AGE[healthCheckAnswers?.age ?? ''] ?? 25,
-      gender: 'other',
-      duration: '1-3 days',
       severity: FEELING_TO_SEVERITY[healthCheckAnswers?.feeling ?? ''] ?? 'Moderate',
-      answers: healthCheckAnswers?.concern ? { concern: healthCheckAnswers.concern } : {},
+      history,
+    });
+
+    stopDots();
+    setMessages((prev) => prev.filter((m) => !m.typing));
+
+    if (!result.done) {
+      const question = result.question ?? 'Can you tell me a bit more?';
+      setCurrentQuestion(question);
+      setCurrentOptions(result.options ?? []);
+      setMessages((prev) => [...prev, { role: 'assistant', text: question }]);
+      setStage('clarify');
+      return;
+    }
+
+    if (result.duration) {
+      setDurationAnswer(result.duration);
+      setMessages((prev) => [...prev, {
+        role: 'assistant',
+        text: 'Got it. And which best describes you?',
+      }]);
+      setStage('gender');
+    } else {
+      setMessages((prev) => [...prev, {
+        role: 'assistant',
+        text: 'Got it. How long have you had this?',
+      }]);
+      setStage('duration');
+    }
+  };
+
+  const handleSendSymptom = () => {
+    const text = input.trim();
+    if (!text || stage !== 'symptom') return;
+
+    setInput('');
+    setSymptomText(text);
+    setMessages((prev) => [...prev, { role: 'user', text }]);
+    setStage('done'); // lock the input while the AI decides on a follow-up
+    runClarifyStep(text, []);
+  };
+
+  const handleClarifyPick = (option: string) => {
+    if (!currentQuestion) return;
+
+    const nextHistory = [...clarifyHistory, { question: currentQuestion, answer: option }];
+    setClarifyHistory(nextHistory);
+    setMessages((prev) => [...prev, { role: 'user', text: option }]);
+    setStage('done'); // hide the chip row while the next step loads
+    runClarifyStep(symptomText, nextHistory);
+  };
+
+  const handleDurationPick = (option: string) => {
+    setDurationAnswer(option);
+    setMessages((prev) => [...prev, { role: 'user', text: option }]);
+    setStage('done'); // hide the chip row while the next question loads
+
+    pushTypingThen(() => {
+      setMessages((prev) => [...prev, {
+        role: 'assistant',
+        text: 'And which best describes you?',
+      }]);
+      setStage('gender');
+    });
+  };
+
+  const handleGenderPick = (label: string, value: string) => {
+    setMessages((prev) => [...prev, { role: 'user', text: label }]);
+    setSending(true);
+    setStage('done');
+
+    const clarifyAnswers = Object.fromEntries(
+      clarifyHistory.map((qa, i) => [`followup_${i + 1}_${qa.question}`, qa.answer]),
+    );
+
+    const request: SymptomsAnalysisRequest = {
+      symptoms: [symptomText],
+      age: AGE_GROUP_TO_AGE[healthCheckAnswers?.age ?? ''] ?? 25,
+      gender: value,
+      duration: durationAnswer ?? '1-3 days',
+      severity: FEELING_TO_SEVERITY[healthCheckAnswers?.feeling ?? ''] ?? 'Moderate',
+      answers: {
+        ...(healthCheckAnswers?.concern ? { concern: healthCheckAnswers.concern } : {}),
+        ...clarifyAnswers,
+      },
     };
     setPendingAnalysisRequest(request);
 
     // Brief typing beat before handing off — the actual analysis runs on the
     // next screen, so this message can't claim findings it doesn't have yet.
-    setTimeout(() => {
-      stopDots();
-      setMessages((prev) => {
-        const without = prev.filter((m) => !m.typing);
-        return [...without, {
-          role: 'assistant',
-          text: "Got it — let me analyze that for you now.",
-        }];
-      });
+    pushTypingThen(() => {
+      setMessages((prev) => [...prev, {
+        role: 'assistant',
+        text: "Got it — let me analyze that for you now.",
+      }]);
 
       setTimeout(() => {
         router.push('/(onboarding)/analysis-loading' as any);
       }, 700);
-    }, 500);
+    });
   };
 
   const inputBottomPadding = keyboardShown ? 12 : Math.max(insets.bottom, 8) + 12;
@@ -154,7 +262,7 @@ export function SymptomChatScreen() {
       behavior="padding"
       keyboardVerticalOffset={0}
     >
-      <StatusBar barStyle="light-content" backgroundColor={TEAL_DARK} />
+      <StatusBar barStyle="light-content" backgroundColor={INK} />
 
       {/* Header */}
       <View style={[styles.header, { paddingTop: headerTopPadding }]}>
@@ -172,7 +280,7 @@ export function SymptomChatScreen() {
           </View>
         </View>
         <View style={styles.secureChip}>
-          <Ionicons name="shield-checkmark" size={11} color="#4ADE80" />
+          <Ionicons name="shield-checkmark-outline" size={12} color={ACCENT} />
           <Text style={styles.secureText}>Private</Text>
         </View>
       </View>
@@ -215,6 +323,50 @@ export function SymptomChatScreen() {
         ))}
       </ScrollView>
 
+      {/* Quick replies */}
+      {stage === 'clarify' && (
+        <View style={styles.chipsRow}>
+          {currentOptions.map((option) => (
+            <TouchableOpacity
+              key={option}
+              style={styles.chip}
+              onPress={() => handleClarifyPick(option)}
+              activeOpacity={0.75}
+            >
+              <Text style={styles.chipText}>{option}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+      {stage === 'duration' && (
+        <View style={styles.chipsRow}>
+          {DURATION_OPTIONS.map((option) => (
+            <TouchableOpacity
+              key={option}
+              style={styles.chip}
+              onPress={() => handleDurationPick(option)}
+              activeOpacity={0.75}
+            >
+              <Text style={styles.chipText}>{option}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+      {stage === 'gender' && (
+        <View style={styles.chipsRow}>
+          {GENDER_OPTIONS.map((option) => (
+            <TouchableOpacity
+              key={option.value}
+              style={styles.chip}
+              onPress={() => handleGenderPick(option.label, option.value)}
+              activeOpacity={0.75}
+            >
+              <Text style={styles.chipText}>{option.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+
       {/* Input */}
       <View style={[styles.inputRow, { paddingBottom: inputBottomPadding }]}>
         <TextInput
@@ -222,12 +374,18 @@ export function SymptomChatScreen() {
           style={styles.input}
           value={input}
           onChangeText={setInput}
-          placeholder="Describe your symptoms..."
-          placeholderTextColor="#aaa"
+          placeholder={
+            stage === 'symptom'
+              ? 'Describe your symptoms...'
+              : stage === 'done'
+                ? 'One moment...'
+                : 'Choose an option above'
+          }
+          placeholderTextColor={INK_FAINT}
           multiline
           maxLength={500}
-          editable={!sending}
-          onSubmitEditing={sendMessage}
+          editable={stage === 'symptom' && !sending}
+          onSubmitEditing={handleSendSymptom}
           returnKeyType="send"
           onFocus={() => {
             setKeyboardShown(true);
@@ -236,14 +394,14 @@ export function SymptomChatScreen() {
           onBlur={() => setKeyboardShown(false)}
         />
         <TouchableOpacity
-          style={[styles.sendBtn, (!input.trim() || sending) && styles.sendBtnDisabled]}
-          onPress={sendMessage}
-          disabled={!input.trim() || sending}
+          style={[styles.sendBtn, (stage !== 'symptom' || !input.trim() || sending) && styles.sendBtnDisabled]}
+          onPress={handleSendSymptom}
+          disabled={stage !== 'symptom' || !input.trim() || sending}
           activeOpacity={0.8}
         >
           {sending
-            ? <ActivityIndicator size="small" color="#fff" />
-            : <Ionicons name="send" size={18} color="#fff" />
+            ? <ActivityIndicator size="small" color={PAPER} />
+            : <Ionicons name="arrow-up" size={18} color={PAPER} />
           }
         </TouchableOpacity>
       </View>
@@ -253,9 +411,9 @@ export function SymptomChatScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: BG },
+  root: { flex: 1, backgroundColor: PAPER },
   header: {
-    backgroundColor: TEAL_DARK,
+    backgroundColor: INK,
     paddingTop: 52, paddingBottom: 16,
     paddingHorizontal: 20,
     flexDirection: 'row', alignItems: 'center',
@@ -263,62 +421,69 @@ const styles = StyleSheet.create({
   },
   headerLeft:  { flexDirection: 'row', alignItems: 'center', gap: 12 },
   avatar: {
-    width: 42, height: 42, borderRadius: 21,
-    backgroundColor: 'rgba(255,255,255,0.15)',
+    width: 40, height: 40, borderRadius: 20,
+    backgroundColor: 'rgba(238,241,234,0.14)',
     alignItems: 'center', justifyContent: 'center',
   },
-  crossV: { position: 'absolute', width: 4, height: 20, backgroundColor: '#fff', borderRadius: 2 },
-  crossH: { position: 'absolute', width: 20, height: 4, backgroundColor: '#fff', borderRadius: 2 },
-  headerName:  { color: '#fff', fontSize: 15, fontWeight: '700' },
+  crossV: { position: 'absolute', width: 3, height: 18, backgroundColor: PAPER, borderRadius: 1.5 },
+  crossH: { position: 'absolute', width: 18, height: 3, backgroundColor: PAPER, borderRadius: 1.5 },
+  headerName:  { color: PAPER, fontSize: 15, fontWeight: '600' },
   onlineRow:   { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 },
-  onlineDot:   { width: 7, height: 7, borderRadius: 4, backgroundColor: '#4ADE80' },
-  onlineText:  { color: 'rgba(255,255,255,0.6)', fontSize: 11 },
+  onlineDot:   { width: 6, height: 6, borderRadius: 3, backgroundColor: SUCCESS },
+  onlineText:  { color: 'rgba(238,241,234,0.6)', fontSize: 11 },
   secureChip: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    backgroundColor: PAPER,
     paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20,
   },
-  secureText: { color: '#4ADE80', fontSize: 11, fontWeight: '600' },
+  secureText: { color: INK, fontSize: 11, fontWeight: '600' },
   messages:        { flex: 1 },
   messagesContent: { padding: 16, gap: 10, paddingBottom: 8 },
   bubble: {
-    maxWidth: '80%', borderRadius: 16, padding: 14,
+    maxWidth: '80%', borderRadius: 4, padding: 14,
   },
   bubbleAI: {
-    backgroundColor: '#fff', alignSelf: 'flex-start',
-    borderBottomLeftRadius: 4,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06, shadowRadius: 4, elevation: 2,
+    backgroundColor: PAPER, alignSelf: 'flex-start',
+    borderWidth: 1, borderColor: RULE,
   },
   bubbleUser: {
-    backgroundColor: TEAL, alignSelf: 'flex-end',
-    borderBottomRightRadius: 4,
+    backgroundColor: INK, alignSelf: 'flex-end',
   },
-  bubbleTextAI:   { color: '#333', fontSize: 14, lineHeight: 22 },
-  bubbleTextUser: { color: '#fff', fontSize: 14, lineHeight: 22 },
+  bubbleTextAI:   { color: INK, fontSize: 14, lineHeight: 22 },
+  bubbleTextUser: { color: PAPER, fontSize: 14, lineHeight: 22 },
   typingDots:    { gap: 8 },
-  analyzingText: { color: '#888', fontSize: 12, fontStyle: 'italic' },
+  analyzingText: { color: INK_FAINT, fontSize: 12, fontStyle: 'italic' },
   dotsRow:       { flexDirection: 'row', gap: 5, alignItems: 'center', marginTop: 4 },
   dot: {
-    width: 8, height: 8, borderRadius: 4,
-    backgroundColor: TEAL, opacity: 0.7,
+    width: 6, height: 6, borderRadius: 3,
+    backgroundColor: INK, opacity: 0.6,
   },
+  chipsRow: {
+    flexDirection: 'row', flexWrap: 'wrap', gap: 8,
+    paddingHorizontal: 16, paddingTop: 4, paddingBottom: 12,
+    backgroundColor: PAPER,
+  },
+  chip: {
+    borderWidth: 1, borderColor: RULE_STRONG, borderRadius: 20,
+    paddingHorizontal: 14, paddingVertical: 8,
+  },
+  chipText: { color: INK, fontSize: 13, fontWeight: '600' },
   inputRow: {
     flexDirection: 'row', alignItems: 'flex-end', gap: 10,
     paddingHorizontal: 16, paddingVertical: 12,
-    backgroundColor: '#fff',
-    borderTopWidth: 1, borderTopColor: '#E5E5E5',
+    backgroundColor: PAPER,
+    borderTopWidth: 1, borderTopColor: RULE,
   },
   input: {
-    flex: 1, backgroundColor: BG, borderRadius: 22,
-    paddingHorizontal: 16, paddingVertical: 10,
-    fontSize: 14, color: '#333', maxHeight: 100,
-    borderWidth: 1, borderColor: '#D1E8E8',
+    flex: 1, backgroundColor: PAPER, borderRadius: 4,
+    paddingHorizontal: 14, paddingVertical: 10,
+    fontSize: 14, color: INK, maxHeight: 100,
+    borderWidth: 1, borderColor: RULE,
   },
   sendBtn: {
-    width: 44, height: 44, borderRadius: 22,
-    backgroundColor: TEAL,
+    width: 42, height: 42, borderRadius: 21,
+    backgroundColor: INK,
     alignItems: 'center', justifyContent: 'center',
   },
-  sendBtnDisabled: { backgroundColor: '#B0CECE' },
+  sendBtnDisabled: { backgroundColor: RULE },
 });

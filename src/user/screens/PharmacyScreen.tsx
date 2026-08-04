@@ -4,6 +4,7 @@ import {
   FlatList, StyleSheet, ActivityIndicator,
   Modal, ScrollView, Linking
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useAuthStore } from '@/src/store/authStore';
 import { getPharmacies } from '@/src/services/pharmacy.service';
 
@@ -22,11 +23,13 @@ type Pharmacy = {
 };
 
 export function PharmacyScreen() {
+  const router = useRouter();
   const token = useAuthStore((state) => state.token);
   const [pharmacies, setPharmacies] = useState<Pharmacy[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<Pharmacy | null>(null);
+  const [accessLocked, setAccessLocked] = useState(false);
 
   useEffect(() => {
     fetchPharmacies();
@@ -36,8 +39,10 @@ export function PharmacyScreen() {
     setLoading(true);
     try {
       const data = await getPharmacies(token!, query);
+      setAccessLocked(false);
       setPharmacies(data.data);
-    } catch {
+    } catch (error: any) {
+      setAccessLocked(error?.code === 'permission-denied');
       setPharmacies([]);
     } finally {
       setLoading(false);
@@ -83,10 +88,23 @@ export function PharmacyScreen() {
           keyExtractor={(item) => item.id.toString()}
           contentContainerStyle={styles.list}
           ListEmptyComponent={
-            <View style={styles.empty}>
-              <Text style={styles.emptyIcon}>💊</Text>
-              <Text style={styles.emptyText}>No pharmacies found</Text>
-            </View>
+            accessLocked ? (
+              <View style={styles.empty}>
+                <Text style={styles.emptyIcon}>🔒</Text>
+                <Text style={styles.emptyText}>Subscribe to view pharmacies near you</Text>
+                <TouchableOpacity
+                  onPress={() => router.push('/(tabs)/subscription' as any)}
+                  style={[styles.searchBtn, { marginTop: 12 }]}
+                >
+                  <Text style={styles.searchBtnText}>View plans</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={styles.empty}>
+                <Text style={styles.emptyIcon}>💊</Text>
+                <Text style={styles.emptyText}>No pharmacies found</Text>
+              </View>
+            )
           }
           renderItem={({ item }) => (
             <TouchableOpacity style={styles.card} onPress={() => setSelected(item)}>

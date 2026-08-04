@@ -26,13 +26,6 @@ type AuthState = {
   clearAuth: () => Promise<void>;
   loadAuth: () => Promise<void>;
   completeOnboarding: () => Promise<void>;
-  updateSubscription: (data: {
-    is_subscribed: boolean;
-    has_subscribed?: boolean;
-    subscription_plan?: string | null;
-    chat_count?: number;
-    subscription_expires_at?: string | null;
-  }) => Promise<void>;
   refreshUser: (token: string) => Promise<void>;
 };
 
@@ -126,31 +119,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         // Keep local completion even if Firestore is temporarily unavailable.
       }
     }
-  },
-
-  // Call this after a successful subscription payment
-  updateSubscription: async ({
-    is_subscribed,
-    has_subscribed,
-    subscription_plan,
-    chat_count,
-    subscription_expires_at,
-  }) => {
-    const current = get().user;
-    if (!current) return;
-
-    const updated: User = {
-      ...current,
-      is_subscribed,
-      has_subscribed: has_subscribed ?? current.has_subscribed ?? is_subscribed,
-      subscription_plan: subscription_plan ?? current.subscription_plan,
-      chat_count: chat_count ?? current.chat_count,
-      subscription_expires_at:
-        subscription_expires_at ?? current.subscription_expires_at,
-    };
-
-    await AsyncStorage.setItem("user", JSON.stringify(updated));
-    set({ user: updated });
   },
 
   // Call after login/payment to sync latest user state from Firebase

@@ -4,12 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Animated, StatusBar, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useDiagnosisStore } from "@/src/store/diagnosisStore";
 import { requestSymptomsAnalysis } from "@/src/services/symptoms.service";
-
-const INK = "#17104F";
-const PURPLE = "#5B2FD6";
-const LIME = "#C8F24A";
-const BG = "#F7F7FB";
-const RED = "#DC2626";
+import { PAPER, INK, INK_MUTED, INK_FAINT, ACCENT, RULE, RULE_STRONG, SUCCESS, DANGER } from "../theme";
 
 export function AnalysisLoadingScreen() {
   const router = useRouter();
@@ -20,7 +15,7 @@ export function AnalysisLoadingScreen() {
   const [status, setStatus] = useState<"loading" | "error">("loading");
   const [errorMessage, setErrorMessage] = useState("");
 
-  const pulse = useRef(new Animated.Value(0.85)).current;
+  const pulse = useRef(new Animated.Value(0.9)).current;
   const progress = useRef(new Animated.Value(0.08)).current;
   const spin = useRef(new Animated.Value(0)).current;
   const crawlRef = useRef<Animated.CompositeAnimation | null>(null);
@@ -28,13 +23,13 @@ export function AnalysisLoadingScreen() {
   const startMotion = useCallback(() => {
     Animated.loop(
       Animated.sequence([
-        Animated.timing(pulse, { toValue: 1.08, duration: 700, useNativeDriver: true }),
-        Animated.timing(pulse, { toValue: 0.85, duration: 700, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 1.05, duration: 700, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 0.9, duration: 700, useNativeDriver: true }),
       ]),
     ).start();
 
     Animated.loop(
-      Animated.timing(spin, { toValue: 1, duration: 2200, useNativeDriver: true }),
+      Animated.timing(spin, { toValue: 1, duration: 2600, useNativeDriver: true }),
     ).start();
 
     // Progress has no way to know real completion percentage, so it creeps
@@ -124,11 +119,11 @@ export function AnalysisLoadingScreen() {
 
   return (
     <View style={styles.root}>
-      <StatusBar barStyle="dark-content" backgroundColor={BG} />
+      <StatusBar barStyle="dark-content" backgroundColor={PAPER} />
 
       <View style={styles.header}>
         <View style={styles.avatar}>
-          <Ionicons name="sparkles" size={17} color={LIME} />
+          <Ionicons name="sparkles-outline" size={16} color={PAPER} />
         </View>
         <View>
           <Text style={styles.name}>AfyaSmart AI</Text>
@@ -141,12 +136,12 @@ export function AnalysisLoadingScreen() {
           <>
             <Animated.View
               style={[
-                styles.analysisOrb,
+                styles.analysisRing,
                 { transform: [{ scale: pulse }, { rotate }] },
               ]}
             >
               <View style={styles.orbCore}>
-                <Ionicons name="medical" size={40} color="#fff" />
+                <Ionicons name="medical-outline" size={36} color={PAPER} />
               </View>
               <View style={[styles.dot, styles.dotOne]} />
               <View style={[styles.dot, styles.dotTwo]} />
@@ -163,9 +158,9 @@ export function AnalysisLoadingScreen() {
           </>
         ) : (
           <>
-            <View style={[styles.analysisOrb, styles.errorOrb]}>
+            <View style={[styles.analysisRing, styles.errorRing]}>
               <View style={[styles.orbCore, styles.errorOrbCore]}>
-                <Ionicons name="alert" size={40} color="#fff" />
+                <Ionicons name="alert-outline" size={36} color={PAPER} />
               </View>
             </View>
 
@@ -186,7 +181,7 @@ export function AnalysisLoadingScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: BG },
+  root: { flex: 1, backgroundColor: PAPER },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -194,9 +189,9 @@ const styles = StyleSheet.create({
     paddingTop: 58,
     paddingHorizontal: 22,
     paddingBottom: 16,
-    backgroundColor: "#fff",
+    backgroundColor: PAPER,
     borderBottomWidth: 1,
-    borderBottomColor: "#ECECF4",
+    borderBottomColor: RULE,
   },
   avatar: {
     width: 36,
@@ -206,8 +201,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  name: { color: INK, fontSize: 14, fontWeight: "900" },
-  status: { color: "#22C55E", fontSize: 11, fontWeight: "700", marginTop: 2 },
+  name: { color: INK, fontSize: 14, fontWeight: "600" },
+  status: { color: SUCCESS, fontSize: 11, fontWeight: "600", marginTop: 2 },
   body: {
     flex: 1,
     alignItems: "center",
@@ -215,63 +210,62 @@ const styles = StyleSheet.create({
     paddingHorizontal: 28,
     paddingBottom: 60,
   },
-  analysisOrb: {
+  analysisRing: {
     width: 150,
     height: 150,
     borderRadius: 75,
-    backgroundColor: "rgba(91,47,214,0.12)",
+    borderWidth: 1,
+    borderColor: RULE_STRONG,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 44,
   },
-  errorOrb: { backgroundColor: "rgba(220,38,38,0.1)" },
+  errorRing: { borderColor: DANGER },
   orbCore: {
-    width: 92,
-    height: 92,
-    borderRadius: 46,
-    backgroundColor: PURPLE,
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    backgroundColor: INK,
     alignItems: "center",
     justifyContent: "center",
   },
-  errorOrbCore: { backgroundColor: RED },
+  errorOrbCore: { backgroundColor: DANGER },
   dot: {
     position: "absolute",
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: PURPLE,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: ACCENT,
   },
   dotOne: { top: 18, right: 28 },
-  dotTwo: { left: 20, bottom: 34, opacity: 0.5 },
-  dotThree: { right: 12, bottom: 44, opacity: 0.35 },
+  dotTwo: { left: 20, bottom: 34, opacity: 0.6 },
+  dotThree: { right: 12, bottom: 44, opacity: 0.4 },
   title: {
     color: INK,
-    fontSize: 19,
-    fontWeight: "900",
+    fontSize: 18,
+    fontWeight: "600",
     textAlign: "center",
     marginBottom: 8,
   },
-  sub: { color: "#5E5A78", fontSize: 13, textAlign: "center", marginBottom: 28 },
+  sub: { color: INK_MUTED, fontSize: 13, textAlign: "center", marginBottom: 28 },
   progressTrack: {
     width: "88%",
-    height: 7,
-    borderRadius: 4,
-    backgroundColor: "#E1E1EA",
+    height: 2,
+    backgroundColor: RULE,
     overflow: "hidden",
   },
   progressFill: {
     height: "100%",
-    borderRadius: 4,
-    backgroundColor: PURPLE,
+    backgroundColor: INK,
   },
-  caption: { color: "#5E5A78", fontSize: 12, marginTop: 12 },
+  caption: { color: INK_FAINT, fontSize: 12, marginTop: 12 },
   retryBtn: {
-    backgroundColor: PURPLE,
-    borderRadius: 14,
+    backgroundColor: INK,
+    borderRadius: 24,
     paddingVertical: 14,
     paddingHorizontal: 32,
     marginTop: 4,
   },
-  retryBtnText: { color: "#fff", fontSize: 14, fontWeight: "800" },
-  backLink: { color: "#5E5A78", fontSize: 13, fontWeight: "600", marginTop: 16 },
+  retryBtnText: { color: PAPER, fontSize: 14, fontWeight: "600" },
+  backLink: { color: INK_FAINT, fontSize: 13, fontWeight: "600", marginTop: 16 },
 });

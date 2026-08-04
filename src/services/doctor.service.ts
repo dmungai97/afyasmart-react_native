@@ -37,6 +37,12 @@ const numericId = (id: string, index = 0) => {
   return Number.isFinite(parsed) ? parsed : index + 1;
 };
 
+// Firestore rejects doctors reads for non-subscribers (see hasActiveSubscription()
+// in firestore.rules) — that denial must propagate as an error, not be swallowed
+// into the bundled seed data below, or the paywall does nothing.
+const isPermissionDenied = (error: unknown) =>
+  (error as { code?: string } | null)?.code === "permission-denied";
+
 const distanceKm = (
   lat1: number,
   lon1: number,
@@ -72,6 +78,13 @@ const mapDoctor = (id: string, data: any, index = 0): Doctor => ({
   available: Boolean(data.available),
 });
 
+// Local-only, unauthenticated doctor list — used by screens (e.g. the map)
+// that intentionally show generic seeded data to everyone regardless of
+// subscription. Never route this through anything that also serves the
+// paywalled directory (fetchNearbyDoctors below).
+export const fetchSeededDoctors = (): Doctor[] =>
+  seededDoctors.map((item, index) => mapDoctor(String(index + 1), item, index));
+
 export const fetchNearbyDoctors = async (
   token: string,
   options?: {
@@ -91,7 +104,8 @@ export const fetchNearbyDoctors = async (
     docs = snap.docs.map((item, index) =>
       mapDoctor(item.id, item.data(), index),
     );
-  } catch {
+  } catch (error) {
+    if (isPermissionDenied(error)) throw error;
     docs = [];
   }
 
@@ -99,12 +113,7 @@ export const fetchNearbyDoctors = async (
   const region = options?.region?.toLowerCase().trim();
   const specialization = options?.specialization?.toLowerCase().trim();
 
-  let doctors =
-    docs.length > 0
-      ? docs
-      : seededDoctors.map((item, index) =>
-          mapDoctor(String(index + 1), item, index),
-        );
+  let doctors = docs.length > 0 ? docs : fetchSeededDoctors();
 
   doctors = doctors.filter((doctor) => {
     if (options?.available !== undefined && doctor.available !== options.available) {
@@ -158,7 +167,8 @@ export const fetchDoctor = async (id: number, token: string): Promise<Doctor> =>
   try {
     const snap = await getDoc(doc(firestore, "doctors", String(id)));
     if (snap.exists()) return mapDoctor(snap.id, snap.data());
-  } catch {
+  } catch (error) {
+    if (isPermissionDenied(error)) throw error;
     // Fall back to bundled seed data below.
   }
 
@@ -173,7 +183,8 @@ export const fetchRegions = async (token: string): Promise<string[]> => {
   try {
     const snap = await getDocs(collection(firestore, "doctors"));
     items = snap.docs.map((item) => item.data());
-  } catch {
+  } catch (error) {
+    if (isPermissionDenied(error)) throw error;
     items = [];
   }
 
@@ -193,7 +204,8 @@ export const fetchSpecializations = async (token: string): Promise<string[]> => 
   try {
     const snap = await getDocs(collection(firestore, "doctors"));
     items = snap.docs.map((item) => item.data());
-  } catch {
+  } catch (error) {
+    if (isPermissionDenied(error)) throw error;
     items = [];
   }
 

@@ -32,6 +32,13 @@ export interface SymptomsAnalysisResponse {
   self_care: string[];
 }
 
+export interface SymptomsClarifyResponse {
+  done: boolean;
+  question?: string;
+  options?: string[];
+  duration?: string;
+}
+
 type FirebaseExtra = {
   mpesaApiBaseUrl?: string;
   functionsBaseUrl?: string;
@@ -47,20 +54,25 @@ const symptomsApiBaseUrl = USE_FIREBASE_FUNCTIONS
   ? (process.env.EXPO_PUBLIC_FUNCTIONS_BASE_URL ?? extra.functionsBaseUrl ?? "https://us-central1-afya-smart-377ad.cloudfunctions.net")
   : (process.env.EXPO_PUBLIC_MPESA_API_BASE_URL ?? extra.mpesaApiBaseUrl ?? "https://afyasmart-ey9q.onrender.com/api/v1");
 
+// Onboarding lets users check symptoms before creating an account, so these
+// endpoints identify the caller by a locally persisted guest id rather than
+// requiring a Firebase Auth session.
+const resolveFirebaseUid = async (): Promise<string> => {
+  const existing = firebaseAuth.currentUser?.uid;
+  if (existing) return existing;
+
+  const guestUuid = await AsyncStorage.getItem("guest_uuid");
+  if (guestUuid) return guestUuid;
+
+  const generated = `guest_${Math.random().toString(36).substring(2, 11)}_${Date.now()}`;
+  await AsyncStorage.setItem("guest_uuid", generated);
+  return generated;
+};
+
 export const requestSymptomsAnalysis = async (
   input: Omit<SymptomsAnalysisRequest, "firebase_uid">,
 ): Promise<SymptomsAnalysisResponse> => {
-  let firebase_uid: string | undefined = firebaseAuth.currentUser?.uid || undefined;
-  if (!firebase_uid) {
-    // Generate or retrieve a persistent guest UUID for unauthenticated onboarding symptom checks
-    const guestUuid = await AsyncStorage.getItem("guest_uuid");
-    if (guestUuid) {
-      firebase_uid = guestUuid;
-    } else {
-      firebase_uid = `guest_${Math.random().toString(36).substring(2, 11)}_${Date.now()}`;
-      await AsyncStorage.setItem("guest_uuid", firebase_uid);
-    }
-  }
+  const firebase_uid = await resolveFirebaseUid();
 
   const endpoint = USE_FIREBASE_FUNCTIONS
     ? `${symptomsApiBaseUrl}/symptomsAnalyze`
@@ -83,4 +95,40 @@ export const requestSymptomsAnalysis = async (
   }
 
   throw new Error("Invalid response format received from the server.");
+};
+
+// Best-effort — only available on the Firebase Functions path, and fails
+// safe to `{ done: true }` on any error so a flaky/unreachable endpoint never
+// blocks the onboarding funnel. Callers should treat a missing `duration` on
+// a `done: true` result as "clarification wasn't available", not "the user
+// has no symptom duration".
+export const requestSymptomsClarification = async (params: {
+  symptom: string;
+  age: number;
+  severity: string;
+  history: { question: string; answer: string }[];
+}): Promise<SymptomsClarifyResponse> => {
+  if (!USE_FIREBASE_FUNCTIONS) {
+    return { done: true };
+  }
+
+  try {
+    const firebase_uid = await resolveFirebaseUid();
+
+    const response = await fetch(`${symptomsApiBaseUrl}/symptomsClarify`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ firebase_uid, ...params }),
+    });
+
+    const body = await response.json().catch(() => null);
+
+    if (!response.ok || body?.status !== "success" || !body?.data) {
+      return { done: true };
+    }
+
+    return body.data as SymptomsClarifyResponse;
+  } catch {
+    return { done: true };
+  }
 };

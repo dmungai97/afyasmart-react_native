@@ -6,10 +6,7 @@ import {
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useDiagnosisStore } from '@/src/store/diagnosisStore';
-
-const TEAL      = '#0B6E6E';
-const TEAL_DARK = '#063D3D';
-const BG        = '#F0F7F7';
+import { PAPER, INK, INK_MUTED, INK_FAINT, ACCENT, RULE, RULE_STRONG } from '../theme';
 
 const STEPS = [
   {
@@ -88,12 +85,12 @@ export function HealthCheckScreen() {
 
   return (
     <View style={styles.root}>
-      <StatusBar barStyle="dark-content" backgroundColor={BG} />
+      <StatusBar barStyle="dark-content" backgroundColor={PAPER} />
 
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={handleBack} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={22} color={TEAL_DARK} />
+          <Ionicons name="arrow-back" size={22} color={INK} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Quick Health Check</Text>
         <Text style={styles.stepLabel}>{step + 1}/{STEPS.length}</Text>
@@ -114,22 +111,23 @@ export function HealthCheckScreen() {
         </Animated.View>
 
         {/* Options */}
-        <Animated.View style={[styles.optionsGrid, { transform: [{ translateX: slideAnim }] }]}>
+        <Animated.View style={[styles.optionsList, { transform: [{ translateX: slideAnim }] }]}>
           {current.options.map((option) => {
             const selected = answers[current.id] === option;
             return (
               <TouchableOpacity
                 key={option}
-                style={[styles.optionCard, selected && styles.optionCardSelected]}
+                style={styles.optionRow}
                 onPress={() => handleSelect(option)}
                 activeOpacity={0.75}
               >
-                {selected && (
-                  <Ionicons name="checkmark-circle" size={18} color={TEAL} style={styles.optionCheck} />
-                )}
+                <View style={[styles.optionRule, selected && styles.optionRuleSelected]} />
                 <Text style={[styles.optionText, selected && styles.optionTextSelected]}>
                   {option}
                 </Text>
+                {selected && (
+                  <Ionicons name="checkmark" size={18} color={ACCENT} />
+                )}
               </TouchableOpacity>
             );
           })}
@@ -137,7 +135,7 @@ export function HealthCheckScreen() {
 
         {/* Personalisation note */}
         <View style={styles.personalNote}>
-          <Ionicons name="sparkles" size={14} color={TEAL} />
+          <Ionicons name="sparkles-outline" size={14} color={INK_FAINT} />
           <Text style={styles.personalNoteText}>
             Your answers help us personalise your health analysis
           </Text>
@@ -149,49 +147,52 @@ export function HealthCheckScreen() {
 }
 
 const styles = StyleSheet.create({
-  root:  { flex: 1, backgroundColor: BG },
+  root:  { flex: 1, backgroundColor: PAPER },
   header: {
     flexDirection: 'row', alignItems: 'center',
     paddingTop: 56, paddingHorizontal: 20, paddingBottom: 12,
     justifyContent: 'space-between',
   },
-  backBtn:     { padding: 8 },
-  headerTitle: { color: TEAL_DARK, fontSize: 16, fontWeight: '700' },
-  stepLabel:   { color: TEAL, fontSize: 14, fontWeight: '600' },
+  backBtn:     { padding: 8, marginLeft: -8 },
+  headerTitle: { color: INK, fontSize: 16, fontWeight: '600' },
+  stepLabel:   { color: INK_FAINT, fontSize: 13, fontWeight: '600', fontVariant: ['tabular-nums'] },
   progressTrack: {
-    height: 4, backgroundColor: '#D1E8E8',
-    marginHorizontal: 20, borderRadius: 2, marginBottom: 8,
+    height: 2, backgroundColor: RULE,
+    marginHorizontal: 20, marginBottom: 8,
   },
   progressFill: {
-    height: '100%', backgroundColor: TEAL, borderRadius: 2,
+    height: '100%', backgroundColor: INK,
   },
-  body: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 40 },
+  body: { paddingHorizontal: 24, paddingTop: 24, paddingBottom: 40 },
   questionSection: { alignItems: 'center', marginBottom: 32 },
-  emoji:           { fontSize: 48, marginBottom: 16 },
+  emoji:           { fontSize: 44, marginBottom: 16 },
   question: {
-    color: TEAL_DARK, fontSize: 22, fontWeight: '800',
-    textAlign: 'center', lineHeight: 30, marginBottom: 8,
+    color: INK, fontSize: 21, fontWeight: '600',
+    textAlign: 'center', lineHeight: 28, marginBottom: 8,
   },
-  questionHint: { color: '#999', fontSize: 13 },
-  optionsGrid: { gap: 12, marginBottom: 32 },
-  optionCard: {
-    backgroundColor: '#fff', borderRadius: 14,
-    paddingVertical: 18, paddingHorizontal: 20,
-    borderWidth: 2, borderColor: 'transparent',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05, shadowRadius: 4, elevation: 2,
+  questionHint: { color: INK_FAINT, fontSize: 13 },
+  optionsList: {
+    marginBottom: 32,
+    borderTopWidth: 1,
+    borderTopColor: RULE,
+  },
+  optionRow: {
     flexDirection: 'row', alignItems: 'center',
+    paddingVertical: 16,
+    borderBottomWidth: 1, borderBottomColor: RULE,
   },
-  optionCardSelected: {
-    borderColor: TEAL, backgroundColor: '#E8F4F4',
+  optionRule: {
+    width: 2, height: 18,
+    backgroundColor: RULE_STRONG,
+    marginRight: 14,
   },
-  optionCheck:         { marginRight: 10 },
-  optionText:          { color: '#444', fontSize: 15, fontWeight: '500', flex: 1 },
-  optionTextSelected:  { color: TEAL_DARK, fontWeight: '700' },
+  optionRuleSelected: { backgroundColor: ACCENT },
+  optionText:          { color: INK_MUTED, fontSize: 15, flex: 1 },
+  optionTextSelected:  { color: INK, fontWeight: '600' },
   personalNote: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: '#E0F0F0', borderRadius: 10,
-    padding: 12,
+    paddingTop: 16,
+    borderTopWidth: 1, borderTopColor: RULE,
   },
-  personalNoteText: { color: TEAL, fontSize: 12, flex: 1, lineHeight: 18 },
+  personalNoteText: { color: INK_FAINT, fontSize: 12, flex: 1, lineHeight: 18 },
 });

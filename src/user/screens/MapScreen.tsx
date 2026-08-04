@@ -6,8 +6,8 @@ import {
 import MapView, { Marker, PROVIDER_GOOGLE, Circle } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
-import { fetchNearbyDoctors } from '@/src/services/doctor.service';
-import { getPharmacies } from '@/src/services/pharmacy.service';
+import { fetchSeededDoctors } from '@/src/services/doctor.service';
+import { fetchSeededPharmacies } from '@/src/services/pharmacy.service';
 
 const TEAL  = '#0B6E6E';
 const RED   = '#DC2626';
@@ -227,23 +227,12 @@ async function fetchNominatimHealthCentres(
   return centres;
 }
 
-async function fetchSeededHealthCentres(
-  coords?: { latitude: number; longitude: number } | null,
-): Promise<Centre[]> {
-  const [doctorsResult, pharmaciesResult] = await Promise.all([
-    fetchNearbyDoctors('', {
-      ...(coords
-        ? {
-            lat: coords.latitude,
-            lng: coords.longitude,
-            radius: 500,
-          }
-        : {}),
-    }),
-    getPharmacies(''),
-  ]);
-
-  const doctors: Centre[] = doctorsResult.data
+// Deliberately reads the bundled seed lists directly (not the Firestore-backed,
+// subscription-gated fetchNearbyDoctors/getPharmacies) — the map's "seeded Kenya
+// services" fallback is meant to be free for everyone, unlike the paid directory
+// screens, so it must not depend on a Firestore permission check succeeding.
+function fetchSeededHealthCentres(): Centre[] {
+  const doctors: Centre[] = fetchSeededDoctors()
     .filter((doctor) => doctor.latitude && doctor.longitude)
     .map((doctor) => ({
       id: `doctor-${doctor.id}`,
@@ -257,9 +246,9 @@ async function fetchSeededHealthCentres(
       source: 'seed' as const,
     }));
 
-  const pharmacies: Centre[] = pharmaciesResult.data
-    .filter((pharmacy: any) => pharmacy.latitude && pharmacy.longitude)
-    .map((pharmacy: any) => ({
+  const pharmacies: Centre[] = fetchSeededPharmacies()
+    .filter((pharmacy) => pharmacy.latitude && pharmacy.longitude)
+    .map((pharmacy) => ({
       id: `pharmacy-${pharmacy.id}`,
       name: pharmacy.name,
       type: 'Pharmacy' as const,
@@ -301,7 +290,7 @@ export function MapScreen() {
     (async () => {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        const seedCentres = await fetchSeededHealthCentres(DEFAULT_LOCATION);
+        const seedCentres = fetchSeededHealthCentres();
         const withDistance = seedCentres.map(c => ({
           ...c,
           distance: getDistance(DEFAULT_LOCATION.latitude, DEFAULT_LOCATION.longitude, c.lat, c.lng),
@@ -337,7 +326,7 @@ export function MapScreen() {
           nearbyCentres = nominatimCentres;
         }
 
-        const seedCentres = await fetchSeededHealthCentres(coords);
+        const seedCentres = fetchSeededHealthCentres();
         nearbyCentres = mergeCentres(nearbyCentres, seedCentres);
 
         setLookupError(
@@ -363,7 +352,7 @@ export function MapScreen() {
           longitudeDelta: 0.05,
         }, 1000);
       } catch {
-        const seedCentres = await fetchSeededHealthCentres(DEFAULT_LOCATION);
+        const seedCentres = fetchSeededHealthCentres();
         const withDistance = seedCentres.map(c => ({
           ...c,
           distance: getDistance(DEFAULT_LOCATION.latitude, DEFAULT_LOCATION.longitude, c.lat, c.lng),

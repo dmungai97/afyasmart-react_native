@@ -2,7 +2,6 @@ import Constants from "expo-constants";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { doc, serverTimestamp, setDoc } from "firebase/firestore";
 import { firebaseAuth, firestore } from "./firebase";
-import { subscribeUser } from "./subscription.service";
 import { useAuthStore } from "../store/authStore";
 
 type FirebaseExtra = {
@@ -128,22 +127,13 @@ export const pollMpesaStatus = async (
       checkoutPlans.get(checkoutRequestId) ??
       (await AsyncStorage.getItem(checkoutPlanKey(checkoutRequestId)));
 
-    if (USE_FIREBASE_FUNCTIONS) {
-      // mpesaStatus already activated the subscription server-side — just pull
-      // the fresh users/{uid} doc into local state.
-      await useAuthStore.getState().refreshUser(token ?? "");
-    } else {
-      await savePaymentRequest(checkoutRequestId, {
-        plan: plan ?? null,
-        status: "paid",
-        paid: true,
-        paid_at: serverTimestamp(),
-      });
-
-      if (plan) {
-        await subscribeUser(token, plan);
-      }
-    }
+    // Subscription activation always happens server-side (Admin SDK, verified
+    // against the actual M-Pesa result) — just pull the fresh users/{uid} doc
+    // into local state. A client-side fallback here would let anyone grant
+    // themselves a subscription without paying; Firestore rules block it too
+    // (see isSafeUserUpdate in firestore.rules), but this is intentionally
+    // not attempted at all.
+    await useAuthStore.getState().refreshUser(token ?? "");
 
     if (plan) {
       checkoutPlans.delete(checkoutRequestId);

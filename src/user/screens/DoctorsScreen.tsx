@@ -5,6 +5,7 @@ import {
   Modal, ScrollView, Linking,
 } from 'react-native';
 import * as Location from 'expo-location';
+import { useRouter } from 'expo-router';
 import { useAuthStore } from '@/src/store/authStore';
 import {
   fetchNearbyDoctors,
@@ -30,11 +31,13 @@ function renderStars(rating: number): string {
 }
 
 export function DoctorsScreen() {
+  const router = useRouter();
   const token = useAuthStore((s) => s.token);
 
   const [doctors,         setDoctors]        = useState<Doctor[]>([]);
   const [loading,         setLoading]        = useState(true);
   const [selected,        setSelected]       = useState<Doctor | null>(null);
+  const [accessLocked,    setAccessLocked]   = useState(false);
 
   const [search,          setSearch]         = useState('');
   const [activeRegion,    setActiveRegion]   = useState<string | null>(null);
@@ -80,8 +83,10 @@ export function DoctorsScreen() {
         specialization: activeSpec   ?? undefined,
         ...(nearMeOnly && gps ? { lat: gps.lat, lng: gps.lng, radius: 50 } : {}),
       });
+      setAccessLocked(false);
       setDoctors(data.data);
-    } catch {
+    } catch (error: any) {
+      setAccessLocked(error?.code === 'permission-denied');
       setDoctors([]);
     } finally {
       setLoading(false);
@@ -266,15 +271,28 @@ export function DoctorsScreen() {
           keyExtractor={(item) => item.id.toString()}
           contentContainerStyle={styles.list}
           ListEmptyComponent={
-            <View style={styles.empty}>
-              <Text style={styles.emptyIcon}>👨‍⚕️</Text>
-              <Text style={styles.emptyText}>No doctors found</Text>
-              {hasActiveFilters ? (
-                <TouchableOpacity onPress={clearAllFilters} style={styles.clearAllBtn}>
-                  <Text style={styles.clearAllBtnText}>Clear filters</Text>
+            accessLocked ? (
+              <View style={styles.empty}>
+                <Text style={styles.emptyIcon}>🔒</Text>
+                <Text style={styles.emptyText}>Subscribe to view doctors near you</Text>
+                <TouchableOpacity
+                  onPress={() => router.push('/(tabs)/subscription' as any)}
+                  style={styles.clearAllBtn}
+                >
+                  <Text style={styles.clearAllBtnText}>View plans</Text>
                 </TouchableOpacity>
-              ) : null}
-            </View>
+              </View>
+            ) : (
+              <View style={styles.empty}>
+                <Text style={styles.emptyIcon}>👨‍⚕️</Text>
+                <Text style={styles.emptyText}>No doctors found</Text>
+                {hasActiveFilters ? (
+                  <TouchableOpacity onPress={clearAllFilters} style={styles.clearAllBtn}>
+                    <Text style={styles.clearAllBtnText}>Clear filters</Text>
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+            )
           }
           renderItem={({ item }) => (
             <TouchableOpacity style={styles.card} onPress={() => setSelected(item)}>
