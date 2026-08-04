@@ -9,6 +9,11 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ["admin", "super_admin"];
     }
 
+    function isSuperAdmin() {
+      return request.auth != null
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "super_admin";
+    }
+
     function isOwnUser(userId) {
       return request.auth != null && request.auth.uid == userId;
     }
@@ -70,9 +75,14 @@ service cloud.firestore {
     match /users/{userId} {
       // Fixed recursion: Evaluate isAdmin() ONLY if the user is not reading their own document
       allow read: if request.auth != null && (request.auth.uid == userId || (!isOwnUser(userId) && isAdmin()));
-      
-      // Fixed recursion & fixed syntax parentheses layout
-      allow update: if isSafeUserUpdate(userId) || (!isOwnUser(userId) && isAdmin());
+
+      // A regular admin may edit any non-role field on any user, but only a
+      // super_admin may change the role field itself — otherwise any admin
+      // could promote themselves (or anyone else) straight to super_admin.
+      allow update: if isSafeUserUpdate(userId)
+        || (!isOwnUser(userId) && isAdmin()
+          && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(["role"])
+            || isSuperAdmin()));
       allow create: if isSafeUserCreate(userId) || (!isOwnUser(userId) && isAdmin());
       
       // Admins can list everyone; an affiliate can list only the users they
@@ -122,7 +132,11 @@ service cloud.firestore {
         || (request.auth != null
           && request.resource.data.uid == request.auth.uid
           && isUnpaidPaymentWrite());
-      allow update: if isAdmin()
+      // Even an admin can only ever move a payment to paid:true via the
+      // adminReconcilePayment Cloud Function (Admin SDK, bypasses these
+      // rules) — never a direct client write — because that's the only path
+      // that also credits the referring affiliate's commission.
+      allow update: if (isAdmin() && isUnpaidPaymentWrite())
         || (request.auth != null
           && resource.data.uid == request.auth.uid
           && isUnpaidPaymentWrite());

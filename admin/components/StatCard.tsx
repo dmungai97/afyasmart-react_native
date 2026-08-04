@@ -1,10 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
 import { StyleSheet, Text, View, useWindowDimensions } from "react-native";
 
-const BORDER = "#E2E8F0";
-const TEXT_DARK = "#1E293B";
-const TEXT_MUTED = "#64748B";
-const TREND_GREEN = "#16A34A";
+const BORDER = "#C7CFC2";
+const TEXT_DARK = "#16302B";
+const TEXT_MUTED = "#4B5C50";
+const TREND_GREEN = "#3F7A5C";
 
 type IconName = keyof typeof Ionicons.glyphMap;
 
@@ -27,7 +27,7 @@ export default function StatCard({ item, style }: StatCardProps) {
   const isMobile = width < 768;
 
   return (
-    <View style={[styles.card, isMobile && styles.cardMobile, style]}>
+    <View style={[styles.card, { borderLeftColor: item.color }, isMobile && styles.cardMobile, style]}>
       <View style={styles.content}>
         <Text style={[styles.label, isMobile && styles.labelMobile]}>{item.label}</Text>
         <Text style={[styles.value, isMobile && styles.valueMobile]}>{item.value}</Text>
@@ -36,7 +36,7 @@ export default function StatCard({ item, style }: StatCardProps) {
         </Text>
       </View>
       <View style={[styles.iconWrap, isMobile && styles.iconWrapMobile]}>
-        <Ionicons name={item.icon} size={isMobile ? 16 : 20} color="#475569" />
+        <Ionicons name={item.icon} size={isMobile ? 16 : 20} color={item.color} />
       </View>
     </View>
   );
@@ -46,7 +46,7 @@ const styles = StyleSheet.create({
   card: {
     flexGrow: 1,
     flexBasis: 180,
-    backgroundColor: "#fff",
+    backgroundColor: "#FBFCF9",
     borderRadius: 12,
     padding: 18,
     flexDirection: "row",
@@ -54,11 +54,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     borderWidth: 1,
     borderColor: BORDER,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 1,
+    borderLeftWidth: 3,
   },
   content: {
     flex: 1,
@@ -91,7 +87,7 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: "#F1F5F9",
+    backgroundColor: "#EEF1EA",
     alignItems: "center",
     justifyContent: "center",
   },

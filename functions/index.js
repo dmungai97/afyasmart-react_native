@@ -66,6 +66,23 @@ async function requireUser(req) {
   return getAuth().verifyIdToken(token);
 }
 
+// Verifies the caller's own users/{uid} doc carries an admin role, mirroring
+// the isAdmin() check in firestore.rules. Needed because these endpoints run
+// under the Admin SDK, which bypasses Firestore rules entirely.
+async function requireAdmin(req) {
+  const authUser = await requireUser(req);
+  const userSnap = await db.collection("users").doc(authUser.uid).get();
+  const role = userSnap.exists ? userSnap.data().role : null;
+
+  if (role !== "admin" && role !== "super_admin") {
+    const error = new Error("Admin access required.");
+    error.status = 403;
+    throw error;
+  }
+
+  return authUser;
+}
+
 function getSubscriptionExpiry(plan) {
   const expiresAt = new Date();
 
@@ -866,6 +883,42 @@ exports.mpesaInitiate = onRequest(
   },
 );
 
+// Resolves a payment's outcome by querying Safaricom directly (never by
+// trusting caller-supplied result data) and persists it. Shared by the
+// user-facing polling endpoint and the Safaricom callback, so both routes to
+// "mark this paid" go through the same authoritative check.
+async function resolvePaymentWithMpesa(paymentRef, payment, checkoutId) {
+  const result = await stkQuery(checkoutId);
+  const resultCode = String(result.ResultCode ?? "");
+
+  if (resultCode === "0") {
+    await activateSubscription(payment.uid, payment.plan, payment.amount);
+    await paymentRef.set(
+      { paid: true, status: "paid", result, updated_at: FieldValue.serverTimestamp() },
+      { merge: true },
+    );
+    return { status: "success", paid: true, message: "Payment confirmed." };
+  }
+
+  if (resultCode === "1032") {
+    await paymentRef.set(
+      { paid: false, status: "cancelled", result, updated_at: FieldValue.serverTimestamp() },
+      { merge: true },
+    );
+    return { status: "cancelled", paid: false, message: "Payment cancelled by user." };
+  }
+
+  if (MPESA_TERMINAL_ERROR_CODES.has(resultCode)) {
+    await paymentRef.set(
+      { paid: false, status: "failed", result, updated_at: FieldValue.serverTimestamp() },
+      { merge: true },
+    );
+    return { status: "failed", paid: false, message: result.ResultDesc || "M-Pesa payment failed." };
+  }
+
+  return { status: "pending", paid: false, message: "Waiting for payment confirmation." };
+}
+
 exports.mpesaStatus = onRequest(
   { region: REGION, cors: true, secrets: mpesaSecrets },
   async (req, res) => {
@@ -911,71 +964,8 @@ exports.mpesaStatus = onRequest(
         });
       }
 
-      const result = await stkQuery(checkoutId);
-      const resultCode = String(result.ResultCode ?? "");
-
-      if (resultCode === "0") {
-        await activateSubscription(payment.uid, payment.plan, payment.amount);
-        await paymentRef.set(
-          {
-            paid: true,
-            status: "paid",
-            result,
-            updated_at: FieldValue.serverTimestamp(),
-          },
-          { merge: true },
-        );
-
-        return res.json({
-          status: "success",
-          paid: true,
-          message: "Payment confirmed.",
-        });
-      }
-
-      if (resultCode === "1032") {
-        await paymentRef.set(
-          {
-            paid: false,
-            status: "cancelled",
-            result,
-            updated_at: FieldValue.serverTimestamp(),
-          },
-          { merge: true },
-        );
-
-        return res.json({
-          status: "cancelled",
-          paid: false,
-          message: "Payment cancelled by user.",
-        });
-      }
-
-      if (MPESA_TERMINAL_ERROR_CODES.has(resultCode)) {
-        const failureMessage = result.ResultDesc || "M-Pesa payment failed.";
-
-        await paymentRef.set(
-          {
-            paid: false,
-            status: "failed",
-            result,
-            updated_at: FieldValue.serverTimestamp(),
-          },
-          { merge: true },
-        );
-
-        return res.json({
-          status: "failed",
-          paid: false,
-          message: failureMessage,
-        });
-      }
-
-      return res.json({
-        status: "pending",
-        paid: false,
-        message: "Waiting for payment confirmation.",
-      });
+      const outcome = await resolvePaymentWithMpesa(paymentRef, payment, checkoutId);
+      return res.json(outcome);
     } catch (error) {
       return res.status(error.status || 500).json({
         status: "pending",
@@ -986,42 +976,93 @@ exports.mpesaStatus = onRequest(
   },
 );
 
-exports.mpesaCallback = onRequest({ region: REGION, cors: true }, async (req, res) => {
+// Safaricom's callback body is unauthenticated — the CheckoutRequestID it
+// carries is also handed to the paying client to poll with, so anyone could
+// POST a forged { ResultCode: 0 } here for a checkout they control. Treat the
+// callback purely as a "check now" trigger: it only tells us *which* payment
+// to look at, never whether it succeeded. The actual paid/failed/cancelled
+// outcome always comes from resolvePaymentWithMpesa's own query to Safaricom,
+// authenticated with our own credentials.
+exports.mpesaCallback = onRequest(
+  { region: REGION, cors: true, secrets: mpesaSecrets },
+  async (req, res) => {
+    if (sendCors(req, res)) return;
+
+    try {
+      const checkoutId = req.body?.Body?.stkCallback?.CheckoutRequestID;
+
+      if (checkoutId) {
+        const paymentRef = db.collection("paymentRequests").doc(checkoutId);
+        const paymentSnap = await paymentRef.get();
+
+        if (paymentSnap.exists) {
+          const payment = paymentSnap.data();
+          if (payment.status !== "paid" && payment.paid !== true) {
+            await resolvePaymentWithMpesa(paymentRef, payment, checkoutId);
+          }
+        }
+      }
+
+      return res.json({ ResultCode: 0, ResultDesc: "Accepted" });
+    } catch (error) {
+      console.error("M-Pesa callback error", error);
+      return res.json({ ResultCode: 0, ResultDesc: "Accepted" });
+    }
+  },
+);
+
+// Lets an admin manually mark a stuck/failed payment request as paid (e.g.
+// the customer paid but the STK callback never arrived). Runs through the
+// same activateSubscription() path as the automated callback/poll so the
+// referring affiliate's commission is credited exactly the same way — a
+// direct client-side Firestore write from the admin UI would skip that,
+// since commissions can only ever be written by the Admin SDK.
+exports.adminReconcilePayment = onRequest({ region: REGION, cors: true }, async (req, res) => {
   if (sendCors(req, res)) return;
 
   try {
-    const body = req.body?.Body?.stkCallback;
-    const resultCode = body?.ResultCode;
-    const checkoutId = body?.CheckoutRequestID;
-
-    if (checkoutId) {
-      const paymentRef = db.collection("paymentRequests").doc(checkoutId);
-      const paymentSnap = await paymentRef.get();
-
-      if (paymentSnap.exists) {
-        const payment = paymentSnap.data();
-        const status = resultCode === 0 ? "paid" : resultCode === 1032 ? "cancelled" : "failed";
-
-        await paymentRef.set(
-          {
-            paid: resultCode === 0,
-            status,
-            callback: body,
-            updated_at: FieldValue.serverTimestamp(),
-          },
-          { merge: true },
-        );
-
-        if (resultCode === 0) {
-          await activateSubscription(payment.uid, payment.plan, payment.amount);
-        }
-      }
+    if (req.method !== "POST") {
+      return res.status(405).json({ status: "error", message: "Method not allowed" });
     }
 
-    return res.json({ ResultCode: 0, ResultDesc: "Accepted" });
+    const authUser = await requireAdmin(req);
+    const { payment_id: paymentId } = req.body || {};
+
+    if (!paymentId || typeof paymentId !== "string") {
+      return res.status(422).json({ status: "error", message: "payment_id is required." });
+    }
+
+    const paymentRef = db.collection("paymentRequests").doc(paymentId);
+    const paymentSnap = await paymentRef.get();
+
+    if (!paymentSnap.exists) {
+      return res.status(404).json({ status: "error", message: "Payment request not found." });
+    }
+
+    const payment = paymentSnap.data();
+
+    if (payment.paid === true || payment.status === "paid") {
+      return res.json({ status: "success", message: "Payment was already marked paid." });
+    }
+
+    await activateSubscription(payment.uid, payment.plan, payment.amount);
+    await paymentRef.set(
+      {
+        paid: true,
+        status: "paid",
+        reconciled_by: authUser.uid,
+        paid_at: FieldValue.serverTimestamp(),
+        updated_at: FieldValue.serverTimestamp(),
+      },
+      { merge: true },
+    );
+
+    return res.json({ status: "success", message: "Payment reconciled and subscription activated." });
   } catch (error) {
-    console.error("M-Pesa callback error", error);
-    return res.json({ ResultCode: 0, ResultDesc: "Accepted" });
+    return res.status(error.status || 500).json({
+      status: "error",
+      message: error.message || "Could not reconcile payment.",
+    });
   }
 });
 

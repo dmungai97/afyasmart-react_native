@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
-const SLATE_DARK = "#1E293B";
-const SLATE_MID = "#475569";
-const SLATE_LIGHT = "#94A3B8";
-const BORDER = "#E2E8F0";
-const ACCENT_BLUE = "#3B82F6";
+const SLATE_DARK = "#16302B";
+const SLATE_MID = "#4B5C50";
+const SLATE_LIGHT = "#6B7A70";
+const BORDER = "#C7CFC2";
+const ACCENT_BLUE = "#16302B";
 
 interface IncomeOverviewProps {
   totalRevenue: number;
@@ -112,8 +112,8 @@ export default function IncomeOverview({
               >
                 <View style={[styles.barTrack, isSelected && styles.barTrackSelected, isMobile && styles.mobileBarTrack]}>
                   <View style={[styles.barGroup, isMobile && styles.mobileBarGroup]}>
-                    <View style={[styles.bar, isMobile && styles.mobileBar, { height: revHeight, backgroundColor: isSelected ? "#2563EB" : ACCENT_BLUE }]} />
-                    <View style={[styles.bar, isMobile && styles.mobileBar, { height: subHeight, backgroundColor: isSelected ? "#059669" : "#10B981" }]} />
+                    <View style={[styles.bar, isMobile && styles.mobileBar, { height: revHeight, backgroundColor: isSelected ? "#C9A227" : ACCENT_BLUE }]} />
+                    <View style={[styles.bar, isMobile && styles.mobileBar, { height: subHeight, backgroundColor: "#3F7A5C" }]} />
                   </View>
                 </View>
                 <Text style={[styles.dayLabel, isSelected && styles.dayLabelSelected]}>{day}</Text>
@@ -133,7 +133,7 @@ export default function IncomeOverview({
         </View>
         <View style={[styles.metricBlock, isMobile && styles.mobileMetricBlock]}>
           <View style={styles.metricTitleRow}>
-            <View style={[styles.legendDot, { backgroundColor: "#10B981" }]} />
+            <View style={[styles.legendDot, { backgroundColor: "#3F7A5C" }]} />
             <Text style={styles.footerLabel}>{STRINGS.subscribers}</Text>
           </View>
           <Text style={styles.footerValue}>{formatNumber(subscriptions)}</Text>
@@ -147,7 +147,7 @@ export default function IncomeOverview({
         </View>
         <View style={[styles.metricBlock, isMobile && styles.mobileMetricBlock]}>
           <View style={styles.metricTitleRow}>
-            <View style={[styles.legendDot, { backgroundColor: "#CBD5E1" }]} />
+            <View style={[styles.legendDot, { backgroundColor: "#6B7A70" }]} />
             <Text style={styles.footerLabel}>{STRINGS.drugRecords}</Text>
           </View>
           <Text style={styles.footerValue}>{formatNumber(drugs)}</Text>
@@ -159,18 +159,13 @@ export default function IncomeOverview({
 
 const styles = StyleSheet.create({
   panel: {
-    backgroundColor: "#fff",
+    backgroundColor: "#FBFCF9",
     borderRadius: 12,
     padding: 20,
     borderWidth: 1,
     borderColor: BORDER,
     flexGrow: 1,
-    flexBasis: 320,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 1,
+    flexBasis: 320
   },
   incomePanel: { flexBasis: 520, flexGrow: 2 },
   tabBar: {
@@ -221,7 +216,7 @@ const styles = StyleSheet.create({
   },
   gridLine: {
     borderBottomWidth: 1,
-    borderBottomColor: "#F1F5F9",
+    borderBottomColor: "#EEF1EA",
     borderStyle: "dashed",
     width: "100%",
   },
@@ -245,7 +240,7 @@ const styles = StyleSheet.create({
     paddingBottom: 2,
   },
   barTrackSelected: {
-    backgroundColor: "rgba(59, 130, 246, 0.08)",
+    backgroundColor: "rgba(22, 48, 43, 0.07)",
   },
   barGroup: { flexDirection: "row", alignItems: "flex-end", gap: 3 },
   bar: { width: 6, borderRadius: 3 },
@@ -256,7 +251,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   dayLabelSelected: {
-    color: "#1E293B",
+    color: "#16302B",
     fontWeight: "700",
   },
   chartFooter: {
@@ -268,11 +263,11 @@ const styles = StyleSheet.create({
   metricBlock: {
     flex: 1,
     minWidth: 100,
-    backgroundColor: "#FAFBFD",
+    backgroundColor: "#EEF1EA",
     padding: 12,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: "#F1F5F9",
+    borderColor: "#EEF1EA",
   },
   metricTitleRow: {
     flexDirection: "row",

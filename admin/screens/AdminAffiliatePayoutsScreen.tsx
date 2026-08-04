@@ -21,12 +21,12 @@ import {
 } from "@admin/services/admin.service";
 import { useAuthStore } from "@/src/store/authStore";
 
-const GREEN = "#10B981";
-const RED = "#EF4444";
-const ORANGE = "#F59E0B";
-const BORDER = "#E2E8F0";
-const NAVY = "#1E293B";
-const MUTED = "#64748B";
+const GREEN = "#3F7A5C";
+const RED = "#9C3B2E";
+const ORANGE = "#C9A227";
+const BORDER = "#C7CFC2";
+const NAVY = "#16302B";
+const MUTED = "#4B5C50";
 
 const formatMoney = (v: number) => `Ksh ${new Intl.NumberFormat("en-KE").format(v)}`;
 
@@ -125,9 +125,9 @@ export default function AdminAffiliatePayoutsScreen() {
   };
 
   const statusBg = (status: string) => {
-    if (status === "paid") return "#ECFDF5";
-    if (status === "pending") return "#FFFBEB";
-    return "#FEF2F2";
+    if (status === "paid") return "#E4EAE0";
+    if (status === "pending") return "#F4EBD3";
+    return "#F1E3DE";
   };
 
   return (
@@ -157,7 +157,7 @@ export default function AdminAffiliatePayoutsScreen() {
           <View style={styles.titleRow}>
             {isMobile && (
               <TouchableOpacity style={styles.menuBtn} onPress={() => setMenuOpen(true)} activeOpacity={0.7}>
-                <Ionicons name="menu-outline" size={24} color="#1E293B" />
+                <Ionicons name="menu-outline" size={24} color="#16302B" />
               </TouchableOpacity>
             )}
             <View style={styles.titleTextWrap}>
@@ -166,7 +166,7 @@ export default function AdminAffiliatePayoutsScreen() {
             </View>
           </View>
           <TouchableOpacity style={styles.refreshBtn} onPress={load} activeOpacity={0.8}>
-            <Ionicons name="refresh-outline" size={18} color="#1E293B" />
+            <Ionicons name="refresh-outline" size={18} color="#16302B" />
           </TouchableOpacity>
         </View>
 
@@ -186,7 +186,7 @@ export default function AdminAffiliatePayoutsScreen() {
         </View>
 
         {loading ? (
-          <ActivityIndicator size="large" color="#1E293B" style={{ marginTop: 40 }} />
+          <ActivityIndicator size="large" color="#16302B" style={{ marginTop: 40 }} />
         ) : payouts.length === 0 ? (
           <View style={styles.empty}>
             <Ionicons name="cash-outline" size={48} color={MUTED} />
@@ -215,10 +215,10 @@ export default function AdminAffiliatePayoutsScreen() {
                       disabled={approving === p.id || rejecting === p.id}
                     >
                       {approving === p.id ? (
-                        <ActivityIndicator size="small" color="#fff" />
+                        <ActivityIndicator size="small" color="#EEF1EA" />
                       ) : (
                         <>
-                          <Ionicons name="checkmark-circle-outline" size={16} color="#fff" />
+                          <Ionicons name="checkmark-circle-outline" size={16} color="#EEF1EA" />
                           <Text style={styles.approveBtnText}>Approve</Text>
                         </>
                       )}
@@ -250,26 +250,26 @@ export default function AdminAffiliatePayoutsScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, flexDirection: "row", backgroundColor: "#F8FAFC" },
+  root: { flex: 1, flexDirection: "row", backgroundColor: "#EEF1EA" },
   main: { flex: 1 },
   content: { padding: 24, gap: 16 },
   topbar: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   topbarMobile: { alignItems: "flex-start", gap: 10 },
   titleRow: { flexDirection: "row", alignItems: "center", gap: 12, flex: 1, minWidth: 0 },
   titleTextWrap: { flex: 1, minWidth: 0 },
-  menuBtn: { width: 38, height: 38, borderRadius: 10, backgroundColor: "#fff", borderWidth: 1, borderColor: BORDER, alignItems: "center", justifyContent: "center" },
+  menuBtn: { width: 44, height: 44, borderRadius: 12, backgroundColor: "#FBFCF9", borderWidth: 1, borderColor: BORDER, alignItems: "center", justifyContent: "center" },
   title: { color: NAVY, fontSize: 24, fontWeight: "700" },
   subtitle: { color: MUTED, fontSize: 13, marginTop: 4, fontWeight: "500" },
-  refreshBtn: { width: 38, height: 38, borderRadius: 10, backgroundColor: "#fff", borderWidth: 1, borderColor: BORDER, alignItems: "center", justifyContent: "center" },
+  refreshBtn: { width: 44, height: 44, borderRadius: 12, backgroundColor: "#FBFCF9", borderWidth: 1, borderColor: BORDER, alignItems: "center", justifyContent: "center" },
   kpiRow: { flexDirection: "row", gap: 12, flexWrap: "wrap" },
-  kpiCard: { flex: 1, minWidth: 140, backgroundColor: "#fff", borderRadius: 12, padding: 18, borderWidth: 1, borderColor: BORDER },
+  kpiCard: { flex: 1, minWidth: 140, backgroundColor: "#FBFCF9", borderRadius: 12, padding: 18, borderWidth: 1, borderColor: BORDER },
   kpiLabel: { color: MUTED, fontSize: 10, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.6 },
   kpiValue: { color: NAVY, fontSize: 20, fontWeight: "700", marginTop: 6 },
   empty: { alignItems: "center", paddingTop: 60, gap: 12 },
   emptyText: { color: MUTED, fontSize: 15, fontWeight: "600" },
   list: { gap: 10 },
   card: {
-    backgroundColor: "#fff",
+    backgroundColor: "#FBFCF9",
     borderRadius: 14,
     padding: 16,
     borderWidth: 1,
@@ -278,7 +278,7 @@ const styles = StyleSheet.create({
   },
   cardTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
   cardPhone: { color: NAVY, fontSize: 14, fontWeight: "700" },
-  cardDate: { color: "#94A3B8", fontSize: 11, marginTop: 2, fontWeight: "500" },
+  cardDate: { color: "#6B7A70", fontSize: 11, marginTop: 2, fontWeight: "500" },
   cardAmount: { color: NAVY, fontSize: 20, fontWeight: "800" },
   statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, borderWidth: 1 },
   statusText: { fontSize: 10, fontWeight: "700", textTransform: "capitalize" },
@@ -293,18 +293,18 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingVertical: 10,
   },
-  approveBtnText: { color: "#fff", fontSize: 12, fontWeight: "700" },
+  approveBtnText: { color: "#EEF1EA", fontSize: 12, fontWeight: "700" },
   rejectBtn: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 6,
-    backgroundColor: "#FEF2F2",
+    backgroundColor: "#F1E3DE",
     borderRadius: 10,
     paddingVertical: 10,
     borderWidth: 1,
-    borderColor: "#FEE2E2",
+    borderColor: "#D9B3A8",
   },
   rejectBtnText: { color: RED, fontSize: 12, fontWeight: "700" },
 });

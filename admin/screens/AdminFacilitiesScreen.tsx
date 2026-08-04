@@ -26,12 +26,12 @@ import {
 } from "@admin/services/admin.service";
 import { useAuthStore } from "@/src/store/authStore";
 
-const BLUE = "#3B82F6";
-const GREEN = "#10B981";
-const RED = "#EF4444";
-const BORDER = "#E2E8F0";
-const NAVY = "#1E293B";
-const MUTED = "#64748B";
+const BLUE = "#16302B";
+const GREEN = "#3F7A5C";
+const RED = "#9C3B2E";
+const BORDER = "#C7CFC2";
+const NAVY = "#16302B";
+const MUTED = "#4B5C50";
 
 const STRINGS = {
   title: "Facilities",
@@ -106,6 +106,7 @@ export default function AdminFacilitiesScreen() {
   const [facilities, setFacilities] = useState<AdminFacility[]>([]);
   const [filtered, setFiltered] = useState<AdminFacility[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [activeFilter, setActiveFilter] = useState<"all" | "doctor" | "pharmacy">("all");
 
@@ -122,12 +123,14 @@ export default function AdminFacilitiesScreen() {
 
   const load = async () => {
     setLoading(true);
+    setError(null);
     try {
       const data = await fetchAllFacilities();
       setFacilities(data);
       setFiltered(data);
-    } catch {
+    } catch (err: any) {
       setFacilities([]);
+      setError(err?.message ?? "Failed to load facilities. Pull to refresh to try again.");
     } finally {
       setLoading(false);
     }
@@ -249,7 +252,7 @@ export default function AdminFacilitiesScreen() {
           <View style={styles.titleRow}>
             {isMobile && (
               <TouchableOpacity style={styles.menuBtn} onPress={() => setMenuOpen(true)} activeOpacity={0.7}>
-                <Ionicons name="menu-outline" size={24} color="#1E293B" />
+                <Ionicons name="menu-outline" size={24} color="#16302B" />
               </TouchableOpacity>
             )}
             <View style={styles.backBtnWrap}>
@@ -264,7 +267,7 @@ export default function AdminFacilitiesScreen() {
                 }}
                 activeOpacity={0.7}
               >
-                <Ionicons name="arrow-back" size={18} color="#1E293B" />
+                <Ionicons name="arrow-back" size={18} color="#16302B" />
               </TouchableOpacity>
             </View>
             <View style={styles.titleTextWrap}>
@@ -274,15 +277,22 @@ export default function AdminFacilitiesScreen() {
           </View>
           <View style={[styles.headerActions, isMobile && { width: "100%", justifyContent: "space-between" }]}>
             <TouchableOpacity style={[styles.addBtn, isMobile && { flex: 1, justifyContent: "center" }]} onPress={() => openAdd("doctor")} activeOpacity={0.8}>
-              <Ionicons name="medkit-outline" size={15} color="#fff" />
+              <Ionicons name="medkit-outline" size={15} color="#EEF1EA" />
               <Text style={styles.addBtnText}>+ Doctor</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.addBtn, styles.addBtnSecondary, isMobile && { flex: 1, justifyContent: "center" }]} onPress={() => openAdd("pharmacy")} activeOpacity={0.8}>
-              <Ionicons name="business-outline" size={15} color="#475569" />
-              <Text style={[styles.addBtnText, { color: "#475569" }]}>+ Pharmacy</Text>
+              <Ionicons name="business-outline" size={15} color="#4B5C50" />
+              <Text style={[styles.addBtnText, { color: "#4B5C50" }]}>+ Pharmacy</Text>
             </TouchableOpacity>
           </View>
         </View>
+
+        {error ? (
+          <View style={styles.errorBanner}>
+            <Ionicons name="alert-circle-outline" size={18} color={RED} />
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        ) : null}
 
         {/* Search */}
         <View style={styles.searchRow}>
@@ -315,7 +325,7 @@ export default function AdminFacilitiesScreen() {
 
         {/* Facility list */}
         {loading ? (
-          <ActivityIndicator size="large" color="#1E293B" style={{ marginTop: 40 }} />
+          <ActivityIndicator size="large" color="#16302B" style={{ marginTop: 40 }} />
         ) : filtered.length === 0 ? (
           <View style={styles.empty}>
             <Ionicons name="business-outline" size={48} color={MUTED} />
@@ -332,7 +342,7 @@ export default function AdminFacilitiesScreen() {
                         <Ionicons
                           name={f.type === "doctor" ? "medkit" : "business"}
                           size={20}
-                          color="#475569"
+                          color="#4B5C50"
                         />
                       </View>
                       <View style={styles.cardInfo}>
@@ -365,7 +375,7 @@ export default function AdminFacilitiesScreen() {
                   </View>
                   <View style={styles.cardActions}>
                     <TouchableOpacity style={styles.editAction} onPress={() => openEdit(f)} activeOpacity={0.7}>
-                      <Ionicons name="create" size={14} color="#1E293B" />
+                      <Ionicons name="create" size={14} color="#16302B" />
                       <Text style={styles.editActionText}>Edit Details</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.deleteAction} onPress={() => handleDelete(f)} activeOpacity={0.7}>
@@ -487,7 +497,7 @@ export default function AdminFacilitiesScreen() {
                       <TouchableOpacity style={[styles.roleChip, form.available && styles.roleChipActive]} onPress={() => setForm((prev) => ({ ...prev, available: true }))} activeOpacity={0.7}>
                         <Text style={[styles.roleChipText, form.available && styles.roleChipTextActive]}>{STRINGS.yes}</Text>
                       </TouchableOpacity>
-                      <TouchableOpacity style={[styles.roleChip, !form.available && { backgroundColor: "#FEF2F2", borderColor: "#FECACA" }]} onPress={() => setForm((prev) => ({ ...prev, available: false }))} activeOpacity={0.7}>
+                      <TouchableOpacity style={[styles.roleChip, !form.available && { backgroundColor: "#F1E3DE", borderColor: "#D9B3A8" }]} onPress={() => setForm((prev) => ({ ...prev, available: false }))} activeOpacity={0.7}>
                         <Text style={[styles.roleChipText, !form.available && { color: RED }]}>{STRINGS.no}</Text>
                       </TouchableOpacity>
                     </View>
@@ -523,7 +533,7 @@ export default function AdminFacilitiesScreen() {
                       <TouchableOpacity style={[styles.roleChip, form.open24hrs && styles.roleChipActive]} onPress={() => setForm((prev) => ({ ...prev, open24hrs: true }))} activeOpacity={0.7}>
                         <Text style={[styles.roleChipText, form.open24hrs && styles.roleChipTextActive]}>{STRINGS.yes}</Text>
                       </TouchableOpacity>
-                      <TouchableOpacity style={[styles.roleChip, !form.open24hrs && { backgroundColor: "#FEF2F2", borderColor: "#FECACA" }]} onPress={() => setForm((prev) => ({ ...prev, open24hrs: false }))} activeOpacity={0.7}>
+                      <TouchableOpacity style={[styles.roleChip, !form.open24hrs && { backgroundColor: "#F1E3DE", borderColor: "#D9B3A8" }]} onPress={() => setForm((prev) => ({ ...prev, open24hrs: false }))} activeOpacity={0.7}>
                         <Text style={[styles.roleChipText, !form.open24hrs && { color: RED }]}>{STRINGS.no}</Text>
                       </TouchableOpacity>
                     </View>
@@ -542,7 +552,7 @@ export default function AdminFacilitiesScreen() {
                   disabled={saving}
                 >
                   {saving ? (
-                    <ActivityIndicator size="small" color="#fff" />
+                    <ActivityIndicator size="small" color="#EEF1EA" />
                   ) : (
                     <Text style={styles.saveText}>{isEdit ? STRINGS.save : STRINGS.add}</Text>
                   )}
@@ -558,7 +568,7 @@ export default function AdminFacilitiesScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, flexDirection: "row", backgroundColor: "#F8FAFC" },
+  root: { flex: 1, flexDirection: "row", backgroundColor: "#EEF1EA" },
   main: { flex: 1 },
   content: { padding: 24, gap: 16 },
   topbar: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
@@ -568,7 +578,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 10,
-    backgroundColor: "#fff",
+    backgroundColor: "#FBFCF9",
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
@@ -577,67 +587,78 @@ const styles = StyleSheet.create({
   backBtn: {
     padding: 6,
   },
-  menuBtn: { width: 38, height: 38, borderRadius: 10, backgroundColor: "#fff", borderWidth: 1, borderColor: BORDER, alignItems: "center", justifyContent: "center" },
-  title: { color: "#1E293B", fontSize: 24, fontWeight: "700" },
+  menuBtn: { width: 44, height: 44, borderRadius: 12, backgroundColor: "#FBFCF9", borderWidth: 1, borderColor: BORDER, alignItems: "center", justifyContent: "center" },
+  title: { color: "#16302B", fontSize: 24, fontWeight: "700" },
   titleMobile: { fontSize: 20 },
   subtitle: { color: MUTED, fontSize: 13, marginTop: 4, fontWeight: "500" },
   headerActions: { flexDirection: "row", gap: 8 },
-  addBtn: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#1E293B", paddingHorizontal: 14, paddingVertical: 9, borderRadius: 12 },
-  addBtnSecondary: { backgroundColor: "#F1F5F9", borderWidth: 1, borderColor: "#E2E8F0" },
-  addBtnText: { color: "#fff", fontSize: 12, fontWeight: "700" },
-  searchRow: { flexDirection: "row", alignItems: "center", backgroundColor: "#fff", borderRadius: 10, borderWidth: 1, borderColor: BORDER, height: 44, gap: 8 },
-  searchInput: { flex: 1, color: "#1E293B", fontSize: 13, fontWeight: "500", paddingRight: 12 },
+  addBtn: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#16302B", paddingHorizontal: 14, paddingVertical: 9, borderRadius: 12 },
+  addBtnSecondary: { backgroundColor: "#EEF1EA", borderWidth: 1, borderColor: "#C7CFC2" },
+  addBtnText: { color: "#EEF1EA", fontSize: 12, fontWeight: "700" },
+  errorBanner: {
+    backgroundColor: "#F1E3DE",
+    borderWidth: 1,
+    borderColor: "#D9B3A8",
+    borderRadius: 12,
+    padding: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  errorText: { color: "#9C3B2E", fontSize: 12, fontWeight: "600", flex: 1 },
+  searchRow: { flexDirection: "row", alignItems: "center", backgroundColor: "#FBFCF9", borderRadius: 10, borderWidth: 1, borderColor: BORDER, height: 44, gap: 8 },
+  searchInput: { flex: 1, color: "#16302B", fontSize: 13, fontWeight: "500", paddingRight: 12 },
   filterRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, alignItems: "center" },
-  filterChip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: "#fff", borderWidth: 1, borderColor: BORDER },
-  filterChipActive: { backgroundColor: "#1E293B", borderColor: "#1E293B" },
+  filterChip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: "#FBFCF9", borderWidth: 1, borderColor: BORDER },
+  filterChipActive: { backgroundColor: "#16302B", borderColor: "#16302B" },
   filterChipText: { color: MUTED, fontSize: 12, fontWeight: "600" },
-  filterChipTextActive: { color: "#fff" },
+  filterChipTextActive: { color: "#EEF1EA" },
   countText: { color: MUTED, fontSize: 11, fontWeight: "600", marginLeft: "auto" },
   empty: { alignItems: "center", paddingTop: 60, gap: 12 },
   emptyText: { color: MUTED, fontSize: 15, fontWeight: "600" },
   grid: { gap: 14 },
-  card: { backgroundColor: "#fff", borderRadius: 12, borderWidth: 1, borderColor: BORDER, flexDirection: "row", overflow: "hidden", shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 8, elevation: 1 },
+  card: { backgroundColor: "#FBFCF9", borderRadius: 12, borderWidth: 1, borderColor: BORDER, flexDirection: "row", overflow: "hidden" },
   cardBody: { flex: 1, padding: 16 },
   cardTop: { flexDirection: "row", gap: 12, alignItems: "flex-start" },
-  cardIcon: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", backgroundColor: "#F1F5F9" },
+  cardIcon: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", backgroundColor: "#EEF1EA" },
   cardInfo: { flex: 1, minWidth: 0 },
   cardBadge: { alignItems: "flex-end", gap: 4 },
-  cardName: { color: "#1E293B", fontSize: 15, fontWeight: "600" },
-  cardSpec: { color: "#475569", fontSize: 12, fontWeight: "600", marginTop: 2 },
+  cardName: { color: "#16302B", fontSize: 15, fontWeight: "600" },
+  cardSpec: { color: "#4B5C50", fontSize: 12, fontWeight: "600", marginTop: 2 },
   cardSub: { color: MUTED, fontSize: 11, fontWeight: "500", marginTop: 2 },
   cardPhone: { color: MUTED, fontSize: 11, fontWeight: "500", marginTop: 3 },
-  typeBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, borderWidth: 1, borderColor: "#E2E8F0", backgroundColor: "#F8FAFC" },
-  typeBadgeText: { fontSize: 10, fontWeight: "600", color: "#64748B" },
+  typeBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, borderWidth: 1, borderColor: "#C7CFC2", backgroundColor: "#EEF1EA" },
+  typeBadgeText: { fontSize: 10, fontWeight: "600", color: "#4B5C50" },
   availBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, borderWidth: 1 },
-  availGreen: { backgroundColor: "#ECFDF5", borderColor: "#A7F3D0" },
-  availRed: { backgroundColor: "#FEF2F2", borderColor: "#FECACA" },
+  availGreen: { backgroundColor: "#E4EAE0", borderColor: "#B9C9BC" },
+  availRed: { backgroundColor: "#F1E3DE", borderColor: "#D9B3A8" },
   availText: { fontSize: 10, fontWeight: "600" },
-  open24Badge: { backgroundColor: "#FFFBEB", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, borderWidth: 1, borderColor: "#FEF3C7" },
-  open24Text: { color: "#B45309", fontSize: 10, fontWeight: "600" },
+  open24Badge: { backgroundColor: "#F4EBD3", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, borderWidth: 1, borderColor: "#F4EBD3" },
+  open24Text: { color: "#C9A227", fontSize: 10, fontWeight: "600" },
   cardActions: { flexDirection: "row", gap: 12, marginTop: 14, borderTopWidth: 1, borderTopColor: BORDER, paddingTop: 12 },
-  editAction: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#F1F5F9", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: "#E2E8F0" },
-  editActionText: { color: "#1E293B", fontSize: 11, fontWeight: "600" },
-  deleteAction: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#FEF2F2", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: "#FEE2E2" },
+  editAction: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#EEF1EA", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: "#C7CFC2" },
+  editActionText: { color: "#16302B", fontSize: 11, fontWeight: "600" },
+  deleteAction: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#F1E3DE", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: "#D9B3A8" },
   deleteActionText: { color: RED, fontSize: 11, fontWeight: "600" },
   modalKeyboard: { flex: 1 },
-  modalOverlay: { flex: 1, backgroundColor: "rgba(11, 15, 25, 0.5)", justifyContent: "flex-end" },
+  modalOverlay: { flex: 1, backgroundColor: "rgba(22, 48, 43, 0.55)", justifyContent: "flex-end" },
   modalScroll: { flexGrow: 1, justifyContent: "flex-end" },
-  modalCard: { backgroundColor: "#fff", borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, gap: 14, shadowColor: "#000", shadowOffset: { width: 0, height: -6 }, shadowOpacity: 0.1, shadowRadius: 20, elevation: 8 },
-  modalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", borderBottomWidth: 1, borderBottomColor: "#F1F5F9", paddingBottom: 14 },
-  modalTitle: { color: "#1E293B", fontSize: 18, fontWeight: "700", letterSpacing: -0.5 },
+  modalCard: { backgroundColor: "#FBFCF9", borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, gap: 14 },
+  modalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", borderBottomWidth: 1, borderBottomColor: "#EEF1EA", paddingBottom: 14 },
+  modalTitle: { color: "#16302B", fontSize: 18, fontWeight: "700", letterSpacing: -0.5 },
   modalSub: { color: MUTED, fontSize: 11, fontWeight: "500", marginTop: 2 },
-  modalCloseBtn: { width: 32, height: 32, borderRadius: 8, backgroundColor: "#F8FAFC", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#E2E8F0" },
+  modalCloseBtn: { width: 38, height: 38, borderRadius: 10, backgroundColor: "#EEF1EA", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#C7CFC2" },
   fieldGroup: { gap: 6 },
   fieldLabel: { color: MUTED, fontSize: 10, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.8 },
-  field: { height: 44, borderRadius: 10, borderWidth: 1, borderColor: "#E2E8F0", paddingHorizontal: 14, color: "#1E293B", fontSize: 13, fontWeight: "600", backgroundColor: "#FAFBFD" },
+  field: { height: 44, borderRadius: 10, borderWidth: 1, borderColor: "#C7CFC2", paddingHorizontal: 14, color: "#16302B", fontSize: 13, fontWeight: "600", backgroundColor: "#EEF1EA" },
   roleRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  roleChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, backgroundColor: "#FAFBFD", borderWidth: 1, borderColor: "#E2E8F0" },
-  roleChipActive: { backgroundColor: "#1E293B", borderColor: "#1E293B" },
+  roleChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, backgroundColor: "#EEF1EA", borderWidth: 1, borderColor: "#C7CFC2" },
+  roleChipActive: { backgroundColor: "#16302B", borderColor: "#16302B" },
   roleChipText: { color: MUTED, fontSize: 12, fontWeight: "600", textTransform: "capitalize" },
-  roleChipTextActive: { color: "#fff" },
+  roleChipTextActive: { color: "#EEF1EA" },
   modalActions: { flexDirection: "row", gap: 12, marginTop: 12 },
-  cancelBtn: { flex: 1, height: 46, borderRadius: 12, borderWidth: 1, borderColor: "#E2E8F0", alignItems: "center", justifyContent: "center" },
+  cancelBtn: { flex: 1, height: 46, borderRadius: 12, borderWidth: 1, borderColor: "#C7CFC2", alignItems: "center", justifyContent: "center" },
   cancelText: { color: MUTED, fontWeight: "600", fontSize: 13 },
-  saveBtn: { flex: 2, height: 46, borderRadius: 12, backgroundColor: "#3B82F6", alignItems: "center", justifyContent: "center" },
-  saveText: { color: "#fff", fontWeight: "600", fontSize: 13 },
+  saveBtn: { flex: 2, height: 46, borderRadius: 12, backgroundColor: "#16302B", alignItems: "center", justifyContent: "center" },
+  saveText: { color: "#EEF1EA", fontWeight: "600", fontSize: 13 },
 });

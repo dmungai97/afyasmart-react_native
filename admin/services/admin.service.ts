@@ -2,7 +2,6 @@ import {
   collection,
   doc,
   getCountFromServer,
-  getDoc,
   getDocs,
   addDoc,
   updateDoc,
@@ -12,62 +11,35 @@ import {
   orderBy,
   query,
   serverTimestamp,
+  startAfter,
   Timestamp,
   where,
+  type QueryConstraint,
+  type QueryDocumentSnapshot,
+  type DocumentData,
 } from "firebase/firestore";
 import { firestore } from "@/src/services/firebase";
+import { callFunction } from "@/src/services/functionsApi";
+import {
+  formatDate,
+  paymentAmount,
+  getDateValue,
+  isActiveSubscription,
+} from "@admin/utils/format";
+
+export { formatDate, paymentAmount };
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
-const planAmounts: Record<string, number> = {
-  daily: 20,
-  weekly: 100,
-  monthly: 200,
-};
+// Users and paymentRequests grow unboundedly with platform usage (unlike
+// doctors/pharmacies, which are curated by admins and stay small), so those
+// two lists are paginated instead of fetched in full.
+const ADMIN_PAGE_SIZE = 50;
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
-
-export const formatDate = (value: any) => {
-  const date =
-    typeof value?.toDate === "function"
-      ? value.toDate()
-      : value
-        ? new Date(value)
-        : null;
-  if (!date || Number.isNaN(date.getTime())) return "Recent";
-  return new Intl.DateTimeFormat("en-KE", {
-    day: "2-digit",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
-};
-
-export const paymentAmount = (data: any) => {
-  const direct = Number(data?.amount);
-  if (Number.isFinite(direct) && direct > 0) return direct;
-  const plan = data?.plan;
-  if (plan === "daily" || plan === "weekly" || plan === "monthly") {
-    return planAmounts[plan];
-  }
-  return 0;
-};
-
-const getDateValue = (value: any) => {
-  if (!value) return null;
-  const date =
-    typeof value.toDate === "function"
-      ? value.toDate()
-      : new Date(value);
-
-  return Number.isNaN(date.getTime()) ? null : date;
-};
-
-const isActiveSubscription = (data: any) => {
-  if (!data?.is_subscribed) return false;
-
-  const expiresAt = getDateValue(data.subscription_expires_at);
-  return !expiresAt || expiresAt > new Date();
+export type PagedResult<T> = {
+  items: T[];
+  cursor: QueryDocumentSnapshot<DocumentData> | null;
+  hasMore: boolean;
 };
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -304,11 +276,17 @@ export const fetchAdminDashboardData = async (): Promise<AdminDashboardData> => 
 
 // ── Users Management ──────────────────────────────────────────────────────────
 
-export const fetchAllUsers = async (): Promise<AdminUser[]> => {
-  const snap = await getDocs(
-    query(collection(firestore, "users"), orderBy("created_at", "desc")),
-  );
-  return snap.docs.map((d) => {
+export const fetchUsersPage = async (
+  cursor?: QueryDocumentSnapshot<DocumentData> | null,
+): Promise<PagedResult<AdminUser>> => {
+  const constraints: QueryConstraint[] = [orderBy("created_at", "desc")];
+  if (cursor) constraints.push(startAfter(cursor));
+  constraints.push(limit(ADMIN_PAGE_SIZE + 1));
+
+  const snap = await getDocs(query(collection(firestore, "users"), ...constraints));
+  const docs = snap.docs.slice(0, ADMIN_PAGE_SIZE);
+
+  const items = docs.map((d) => {
     const data = d.data();
 
     const expiresDate = getDateValue(data.subscription_expires_at);
@@ -332,6 +310,12 @@ export const fetchAllUsers = async (): Promise<AdminUser[]> => {
       createdAt: formatDate(data.created_at),
     };
   });
+
+  return {
+    items,
+    cursor: docs.length > 0 ? docs[docs.length - 1] : null,
+    hasMore: snap.docs.length > ADMIN_PAGE_SIZE,
+  };
 };
 
 export const updateAdminUser = async (
@@ -439,11 +423,17 @@ export const deleteFacility = async (
 
 // ── Payments / Transactions ───────────────────────────────────────────────────
 
-export const fetchAllPayments = async (): Promise<AdminPayment[]> => {
-  const snap = await getDocs(
-    query(collection(firestore, "paymentRequests"), orderBy("created_at", "desc")),
-  );
-  return snap.docs.map((d) => {
+export const fetchPaymentsPage = async (
+  cursor?: QueryDocumentSnapshot<DocumentData> | null,
+): Promise<PagedResult<AdminPayment>> => {
+  const constraints: QueryConstraint[] = [orderBy("created_at", "desc")];
+  if (cursor) constraints.push(startAfter(cursor));
+  constraints.push(limit(ADMIN_PAGE_SIZE + 1));
+
+  const snap = await getDocs(query(collection(firestore, "paymentRequests"), ...constraints));
+  const docs = snap.docs.slice(0, ADMIN_PAGE_SIZE);
+
+  const items = docs.map((d) => {
     const data = d.data();
     return {
       id: d.id,
@@ -457,61 +447,25 @@ export const fetchAllPayments = async (): Promise<AdminPayment[]> => {
       paidAt: data.paid_at ? formatDate(data.paid_at) : null,
     };
   });
+
+  return {
+    items,
+    cursor: docs.length > 0 ? docs[docs.length - 1] : null,
+    hasMore: snap.docs.length > ADMIN_PAGE_SIZE,
+  };
 };
 
-export const reconcilePayment = async (
-  paymentId: string,
-  uid: string,
-  plan: string,
-) => {
-  const now = new Date();
-  let days = 0;
-  if (plan === "daily") days = 1;
-  else if (plan === "weekly") days = 7;
-  else if (plan === "monthly") days = 30;
-
-  let expiresAt: Timestamp | null = null;
-  if (uid && days > 0) {
-    let baseDate = now;
-    try {
-      const userDoc = await getDoc(doc(firestore, "users", uid));
-      if (userDoc.exists()) {
-        const userData = userDoc.data();
-        if (userData?.is_subscribed && userData?.subscription_expires_at) {
-          const currentExpiry =
-            typeof userData.subscription_expires_at.toDate === "function"
-              ? userData.subscription_expires_at.toDate()
-              : new Date(userData.subscription_expires_at);
-          if (!Number.isNaN(currentExpiry.getTime()) && currentExpiry > now) {
-            baseDate = currentExpiry; // Stack/accumulate time!
-          }
-        }
-      }
-    } catch (err) {
-      console.warn("Failed to check existing subscription for stacking:", err);
-    }
-    const expiryDate = new Date(baseDate.getTime() + days * 24 * 60 * 60 * 1000);
-    expiresAt = Timestamp.fromDate(expiryDate);
-  }
-
-  // 1. Update the payment request to paid
-  await updateDoc(doc(firestore, "paymentRequests", paymentId), {
-    paid: true,
-    status: "paid",
-    paid_at: serverTimestamp(),
-    updated_at: serverTimestamp(),
+// Runs through the adminReconcilePayment Cloud Function rather than writing
+// paid:true to Firestore directly (the rules no longer even allow that from
+// a client). The function reuses the exact same activateSubscription() path
+// as the automated M-Pesa callback/poll, so the referring affiliate's
+// commission is credited the same way a real payment would be — a direct
+// client write here would silently skip that.
+export const reconcilePayment = async (paymentId: string) => {
+  await callFunction("adminReconcilePayment", {
+    method: "POST",
+    body: { payment_id: paymentId },
   });
-
-  // 2. Activate user subscription
-  if (uid) {
-    await updateDoc(doc(firestore, "users", uid), {
-      is_subscribed: true,
-      has_subscribed: true,
-      subscription_plan: plan,
-      subscription_expires_at: expiresAt,
-      updated_at: serverTimestamp(),
-    });
-  }
 };
 
 export const rejectPayment = async (paymentId: string) => {

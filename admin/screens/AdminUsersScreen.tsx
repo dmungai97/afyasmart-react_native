@@ -16,21 +16,22 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import type { DocumentData, QueryDocumentSnapshot } from "firebase/firestore";
 import Sidebar from "../components/Sidebar";
 import {
   AdminUser,
-  fetchAllUsers,
+  fetchUsersPage,
   updateAdminUser,
 } from "@admin/services/admin.service";
 import { useAuthStore } from "@/src/store/authStore";
 
-const BLUE = "#3B82F6";
-const GREEN = "#10B981";
-const RED = "#EF4444";
-const ORANGE = "#F59E0B";
-const BORDER = "#F1F5F9";
-const NAVY = "#0F172A";
-const MUTED = "#64748B";
+const BLUE = "#16302B";
+const GREEN = "#3F7A5C";
+const RED = "#9C3B2E";
+const ORANGE = "#C9A227";
+const BORDER = "#EEF1EA";
+const NAVY = "#16302B";
+const MUTED = "#4B5C50";
 
 const STRINGS = {
   title: "All Users",
@@ -61,12 +62,12 @@ const STRINGS = {
 
 const getAvatarColor = (name: string) => {
   const colors = [
-    { bg: "#EFF6FF", text: "#3B82F6" }, // Blue
-    { bg: "#ECFDF5", text: "#10B981" }, // Green
-    { bg: "#F5F3FF", text: "#8B5CF6" }, // Purple
-    { bg: "#FFFBEB", text: "#F59E0B" }, // Orange
-    { bg: "#FEF2F2", text: "#EF4444" }, // Red
-    { bg: "#ECFEFF", text: "#06B6D4" }, // Cyan
+    { bg: "#E4E7E2", text: "#16302B" }, // Ink
+    { bg: "#E4EAE0", text: "#3F7A5C" }, // Sage
+    { bg: "#F4EBD3", text: "#C9A227" }, // Gold
+    { bg: "#DEE7E4", text: "#6B8F82" }, // Teal
+    { bg: "#F1E3DE", text: "#9C3B2E" }, // Rose
+    { bg: "#E9E2D8", text: "#4B5C50" }, // Warm neutral
   ];
   const charSum = name.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
   const index = Math.abs(charSum) % colors.length;
@@ -82,10 +83,15 @@ export default function AdminUsersScreen() {
 
   const user = useAuthStore((s) => s.user);
   const clearAuth = useAuthStore((s) => s.clearAuth);
+  const isSuperAdmin = user?.role === "super_admin";
 
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [filtered, setFiltered] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [cursor, setCursor] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [activeFilter, setActiveFilter] = useState<"all" | "subscribed" | "free" | "admin">("all");
 
@@ -103,14 +109,37 @@ export default function AdminUsersScreen() {
 
   const load = async () => {
     setLoading(true);
+    setError(null);
     try {
-      const data = await fetchAllUsers();
-      setUsers(data);
-      setFiltered(data);
-    } catch {
+      const page = await fetchUsersPage();
+      setUsers(page.items);
+      setCursor(page.cursor);
+      setHasMore(page.hasMore);
+    } catch (err: any) {
       setUsers([]);
+      setCursor(null);
+      setHasMore(false);
+      setError(err?.message ?? "Failed to load users. Pull to refresh to try again.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Search/filter below only run over users loaded so far — "Load more"
+  // fetches the next page from the server rather than the whole collection,
+  // so a search term won't match rows that haven't been paged in yet.
+  const loadMore = async () => {
+    if (!hasMore || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const page = await fetchUsersPage(cursor);
+      setUsers((prev) => [...prev, ...page.items]);
+      setCursor(page.cursor);
+      setHasMore(page.hasMore);
+    } catch (err: any) {
+      setError(err?.message ?? "Failed to load more users.");
+    } finally {
+      setLoadingMore(false);
     }
   };
 
@@ -172,7 +201,10 @@ export default function AdminUsersScreen() {
 
       await updateAdminUser(editTarget.id, {
         name: editName.trim(),
-        role: editRole,
+        // Only a super_admin is allowed to change roles (enforced in
+        // firestore.rules too) — a regular admin sending this would just be
+        // rejected, so keep the field out of the payload entirely for them.
+        ...(isSuperAdmin ? { role: editRole } : {}),
         is_subscribed: editSubscribed && editPlan !== "free",
         subscription_plan: editPlan,
         subscription_expires_at: newExpiresAt,
@@ -248,7 +280,7 @@ export default function AdminUsersScreen() {
           <View style={styles.titleRow}>
             {isMobile && (
               <TouchableOpacity style={styles.menuBtn} onPress={() => setMenuOpen(true)} activeOpacity={0.7}>
-                <Ionicons name="menu-outline" size={24} color="#0B0F19" />
+                <Ionicons name="menu-outline" size={24} color="#16302B" />
               </TouchableOpacity>
             )}
             <View style={styles.backBtnWrap}>
@@ -263,7 +295,7 @@ export default function AdminUsersScreen() {
                 }}
                 activeOpacity={0.7}
               >
-                <Ionicons name="arrow-back" size={18} color="#0B0F19" />
+                <Ionicons name="arrow-back" size={18} color="#16302B" />
               </TouchableOpacity>
             </View>
             <View style={styles.titleTextWrap}>
@@ -275,6 +307,13 @@ export default function AdminUsersScreen() {
             <Ionicons name="refresh-outline" size={18} color={BLUE} />
           </TouchableOpacity>
         </View>
+
+        {error ? (
+          <View style={styles.errorBanner}>
+            <Ionicons name="alert-circle-outline" size={18} color={RED} />
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        ) : null}
 
         {/* Search */}
         <View style={styles.searchRow}>
@@ -383,11 +422,11 @@ export default function AdminUsersScreen() {
                           {STRINGS.joined}: {u.createdAt}
                           {u.isSubscribed && u.subscriptionExpiresAt ? (
                             u.isExpired ? (
-                              <Text style={{ color: "#EF4444", fontWeight: "600" }}>
+                              <Text style={{ color: "#9C3B2E", fontWeight: "600" }}>
                                 {"\n"}Expired: {u.subscriptionExpiresAt}
                               </Text>
                             ) : (
-                              <Text style={{ color: "#10B981", fontWeight: "600" }}>
+                              <Text style={{ color: "#3F7A5C", fontWeight: "600" }}>
                                 {"\n"}Expires: {u.subscriptionExpiresAt}
                               </Text>
                             )
@@ -421,11 +460,11 @@ export default function AdminUsersScreen() {
                       {STRINGS.joined}: {u.createdAt}
                       {u.isSubscribed && u.subscriptionExpiresAt ? (
                         u.isExpired ? (
-                          <Text style={{ color: "#EF4444", fontWeight: "600" }}>
+                          <Text style={{ color: "#9C3B2E", fontWeight: "600" }}>
                             {"  •  "}Expired: {u.subscriptionExpiresAt}
                           </Text>
                         ) : (
-                          <Text style={{ color: "#10B981", fontWeight: "600" }}>
+                          <Text style={{ color: "#3F7A5C", fontWeight: "600" }}>
                             {"  •  "}Expires: {u.subscriptionExpiresAt}
                           </Text>
                         )
@@ -447,6 +486,16 @@ export default function AdminUsersScreen() {
             })}
           </View>
         )}
+
+        {!loading && hasMore ? (
+          <TouchableOpacity style={styles.loadMoreBtn} onPress={loadMore} disabled={loadingMore} activeOpacity={0.7}>
+            {loadingMore ? (
+              <ActivityIndicator size="small" color={BLUE} />
+            ) : (
+              <Text style={styles.loadMoreText}>Load more users</Text>
+            )}
+          </TouchableOpacity>
+        ) : null}
       </ScrollView>
 
       {/* Edit Modal */}
@@ -484,21 +533,23 @@ export default function AdminUsersScreen() {
               />
             </View>
 
-            <View style={styles.fieldGroup}>
-              <Text style={styles.fieldLabel}>{STRINGS.role}</Text>
-              <View style={styles.roleRow}>
-                {["user", "admin", "super_admin"].map((r) => (
-                  <TouchableOpacity
-                    key={r}
-                    style={[styles.roleChip, editRole === r && styles.roleChipActive]}
-                    onPress={() => setEditRole(r)}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={[styles.roleChipText, editRole === r && styles.roleChipTextActive]}>{r}</Text>
-                  </TouchableOpacity>
-                ))}
+            {isSuperAdmin && (
+              <View style={styles.fieldGroup}>
+                <Text style={styles.fieldLabel}>{STRINGS.role}</Text>
+                <View style={styles.roleRow}>
+                  {["user", "admin", "super_admin"].map((r) => (
+                    <TouchableOpacity
+                      key={r}
+                      style={[styles.roleChip, editRole === r && styles.roleChipActive]}
+                      onPress={() => setEditRole(r)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[styles.roleChipText, editRole === r && styles.roleChipTextActive]}>{r}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
               </View>
-            </View>
+            )}
 
             <View style={styles.fieldGroup}>
               <Text style={styles.fieldLabel}>{STRINGS.plan}</Text>
@@ -557,7 +608,7 @@ export default function AdminUsersScreen() {
               </TouchableOpacity>
               <TouchableOpacity style={styles.saveBtn} onPress={saveEdit} activeOpacity={0.8} disabled={saving}>
                 {saving ? (
-                  <ActivityIndicator size="small" color="#fff" />
+                  <ActivityIndicator size="small" color="#EEF1EA" />
                 ) : (
                   <Text style={styles.saveText}>{STRINGS.save}</Text>
                 )}
@@ -573,7 +624,7 @@ export default function AdminUsersScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, flexDirection: "row", backgroundColor: "#F8FAFC" },
+  root: { flex: 1, flexDirection: "row", backgroundColor: "#EEF1EA" },
   main: { flex: 1 },
   content: { padding: 24, gap: 20 },
   topbar: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
@@ -584,105 +635,116 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 10,
-    backgroundColor: "#fff",
+    backgroundColor: "#FBFCF9",
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: "#C7CFC2",
   },
   backBtn: {
     padding: 6,
   },
-  menuBtn: { width: 38, height: 38, borderRadius: 10, backgroundColor: "#fff", borderWidth: 1, borderColor: "#E2E8F0", alignItems: "center", justifyContent: "center" },
-  title: { color: "#1E293B", fontSize: 24, fontWeight: "700" },
+  menuBtn: { width: 44, height: 44, borderRadius: 12, backgroundColor: "#FBFCF9", borderWidth: 1, borderColor: "#C7CFC2", alignItems: "center", justifyContent: "center" },
+  title: { color: "#16302B", fontSize: 24, fontWeight: "700" },
   titleMobile: { fontSize: 20 },
-  subtitle: { color: "#64748B", fontSize: 13, marginTop: 4, fontWeight: "500" },
-  refreshBtn: { width: 38, height: 38, borderRadius: 10, backgroundColor: "#fff", borderWidth: 1, borderColor: "#E2E8F0", alignItems: "center", justifyContent: "center" },
-  searchRow: { flexDirection: "row", alignItems: "center", backgroundColor: "#fff", borderRadius: 10, borderWidth: 1, borderColor: "#E2E8F0", height: 44, gap: 8 },
-  searchInput: { flex: 1, color: "#1E293B", fontSize: 13, fontWeight: "500", paddingRight: 12 },
+  subtitle: { color: "#4B5C50", fontSize: 13, marginTop: 4, fontWeight: "500" },
+  refreshBtn: { width: 44, height: 44, borderRadius: 12, backgroundColor: "#FBFCF9", borderWidth: 1, borderColor: "#C7CFC2", alignItems: "center", justifyContent: "center" },
+  errorBanner: {
+    backgroundColor: "#F1E3DE",
+    borderWidth: 1,
+    borderColor: "#D9B3A8",
+    borderRadius: 12,
+    padding: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  errorText: { color: "#9C3B2E", fontSize: 12, fontWeight: "600", flex: 1 },
+  searchRow: { flexDirection: "row", alignItems: "center", backgroundColor: "#FBFCF9", borderRadius: 10, borderWidth: 1, borderColor: "#C7CFC2", height: 44, gap: 8 },
+  searchInput: { flex: 1, color: "#16302B", fontSize: 13, fontWeight: "500", paddingRight: 12 },
   filterRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  filterChip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: "#fff", borderWidth: 1, borderColor: "#E2E8F0" },
-  filterChipActive: { backgroundColor: "#1E293B", borderColor: "#1E293B" },
-  filterChipText: { color: "#64748B", fontSize: 12, fontWeight: "600" },
-  filterChipTextActive: { color: "#fff" },
+  filterChip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: "#FBFCF9", borderWidth: 1, borderColor: "#C7CFC2" },
+  filterChipActive: { backgroundColor: "#16302B", borderColor: "#16302B" },
+  filterChipText: { color: "#4B5C50", fontSize: 12, fontWeight: "600" },
+  filterChipTextActive: { color: "#EEF1EA" },
   statsBar: { flexDirection: "row", gap: 12 },
   statsCardMini: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: "#FBFCF9",
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: "#C7CFC2",
     borderRadius: 12,
-    padding: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 1,
+    padding: 12
   },
-  statsLabelMini: { color: "#64748B", fontSize: 10, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.4 },
-  statsValMini: { color: "#1E293B", fontSize: 16, fontWeight: "700", marginTop: 4 },
+  statsLabelMini: { color: "#4B5C50", fontSize: 10, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.4 },
+  statsValMini: { color: "#16302B", fontSize: 16, fontWeight: "700", marginTop: 4 },
   empty: { alignItems: "center", paddingTop: 60, gap: 12 },
-  emptyText: { color: "#64748B", fontSize: 15, fontWeight: "600" },
+  emptyText: { color: "#4B5C50", fontSize: 15, fontWeight: "600" },
+  loadMoreBtn: {
+    height: 44,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#C7CFC2",
+    backgroundColor: "#FBFCF9",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  loadMoreText: { color: "#16302B", fontSize: 13, fontWeight: "700" },
   table: { gap: 10 },
-  row: { backgroundColor: "#fff", borderRadius: 12, padding: 14, borderWidth: 1, borderColor: "#E2E8F0", flexDirection: "row", alignItems: "center", gap: 12, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 8, elevation: 1 },
-  rowAlt: { backgroundColor: "#FAFBFD" },
-  rowAvatar: { width: 38, height: 38, borderRadius: 19, backgroundColor: "#F1F5F9", alignItems: "center", justifyContent: "center" },
-  avatarText: { fontWeight: "700", fontSize: 15, color: "#1E293B" },
+  row: { backgroundColor: "#FBFCF9", borderRadius: 12, padding: 14, borderWidth: 1, borderColor: "#C7CFC2", flexDirection: "row", alignItems: "center", gap: 12 },
+  rowAlt: { backgroundColor: "#EEF1EA" },
+  rowAvatar: { width: 38, height: 38, borderRadius: 19, backgroundColor: "#EEF1EA", alignItems: "center", justifyContent: "center" },
+  avatarText: { fontWeight: "700", fontSize: 15, color: "#16302B" },
   rowInfo: { flex: 1, gap: 2, minWidth: 0 },
-  rowName: { color: "#1E293B", fontSize: 14, fontWeight: "600" },
-  rowEmail: { color: "#64748B", fontSize: 12, fontWeight: "500" },
-  rowPhone: { color: "#64748B", fontSize: 11, fontWeight: "500" },
-  rowDate: { color: "#94A3B8", fontSize: 10, fontWeight: "500", marginTop: 2 },
+  rowName: { color: "#16302B", fontSize: 14, fontWeight: "600" },
+  rowEmail: { color: "#4B5C50", fontSize: 12, fontWeight: "500" },
+  rowPhone: { color: "#4B5C50", fontSize: 11, fontWeight: "500" },
+  rowDate: { color: "#6B7A70", fontSize: 10, fontWeight: "500", marginTop: 2 },
   rowBadges: { gap: 4, alignItems: "flex-end" },
   badge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, borderWidth: 1 },
   badgeText: { fontSize: 10, fontWeight: "600" },
-  badgeGreen: { backgroundColor: "#ECFDF5", borderColor: "#A7F3D0" },
-  badgeTextGreen: { color: "#10B981" },
-  badgeGray: { backgroundColor: "#F8FAFC", borderColor: "#E2E8F0" },
-  badgeTextGray: { color: "#64748B" },
-  badgeRed: { backgroundColor: "#FEF2F2", borderColor: "#FCA5A5" },
-  badgeTextRed: { color: "#EF4444" },
-  badgeBlue: { backgroundColor: "#F1F5F9", borderColor: "#BFDBFE" },
-  badgeTextBlue: { color: "#3B82F6" },
-  badgeOrange: { backgroundColor: "#FFFBEB", borderColor: "#FDE68A" },
-  badgeTextOrange: { color: "#F59E0B" },
-  editBtn: { width: 34, height: 34, borderRadius: 8, backgroundColor: "#F1F5F9", alignItems: "center", justifyContent: "center" },
+  badgeGreen: { backgroundColor: "#E4EAE0", borderColor: "#B9C9BC" },
+  badgeTextGreen: { color: "#3F7A5C" },
+  badgeGray: { backgroundColor: "#EEF1EA", borderColor: "#C7CFC2" },
+  badgeTextGray: { color: "#4B5C50" },
+  badgeRed: { backgroundColor: "#F1E3DE", borderColor: "#D9B3A8" },
+  badgeTextRed: { color: "#9C3B2E" },
+  badgeBlue: { backgroundColor: "#EEF1EA", borderColor: "#B9C9BC" },
+  badgeTextBlue: { color: "#16302B" },
+  badgeOrange: { backgroundColor: "#F4EBD3", borderColor: "#DDC98A" },
+  badgeTextOrange: { color: "#C9A227" },
+  editBtn: { width: 40, height: 40, borderRadius: 10, backgroundColor: "#EEF1EA", alignItems: "center", justifyContent: "center" },
   modalKeyboard: { flex: 1 },
-  modalOverlay: { flex: 1, backgroundColor: "rgba(11, 15, 25, 0.5)", justifyContent: "flex-end" },
+  modalOverlay: { flex: 1, backgroundColor: "rgba(22, 48, 43, 0.55)", justifyContent: "flex-end" },
   modalScroll: { flexGrow: 1, justifyContent: "flex-end" },
-  modalCard: { backgroundColor: "#fff", borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, gap: 16, shadowColor: "#000", shadowOffset: { width: 0, height: -6 }, shadowOpacity: 0.1, shadowRadius: 20, elevation: 8 },
-  modalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", borderBottomWidth: 1, borderBottomColor: "#F1F5F9", paddingBottom: 14 },
-  modalTitle: { color: "#1E293B", fontSize: 18, fontWeight: "700", letterSpacing: -0.5 },
-  modalSub: { color: "#64748B", fontSize: 11, fontWeight: "500", marginTop: 2 },
-  modalCloseBtn: { width: 32, height: 32, borderRadius: 8, backgroundColor: "#F8FAFC", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#E2E8F0" },
+  modalCard: { backgroundColor: "#FBFCF9", borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, gap: 16 },
+  modalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", borderBottomWidth: 1, borderBottomColor: "#EEF1EA", paddingBottom: 14 },
+  modalTitle: { color: "#16302B", fontSize: 18, fontWeight: "700", letterSpacing: -0.5 },
+  modalSub: { color: "#4B5C50", fontSize: 11, fontWeight: "500", marginTop: 2 },
+  modalCloseBtn: { width: 38, height: 38, borderRadius: 10, backgroundColor: "#EEF1EA", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#C7CFC2" },
   fieldGroup: { gap: 6 },
-  fieldLabel: { color: "#64748B", fontSize: 10, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.8 },
-  field: { height: 44, borderRadius: 10, borderWidth: 1, borderColor: "#E2E8F0", paddingHorizontal: 14, color: "#1E293B", fontSize: 13, fontWeight: "600", backgroundColor: "#FAFBFD" },
+  fieldLabel: { color: "#4B5C50", fontSize: 10, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.8 },
+  field: { height: 44, borderRadius: 10, borderWidth: 1, borderColor: "#C7CFC2", paddingHorizontal: 14, color: "#16302B", fontSize: 13, fontWeight: "600", backgroundColor: "#EEF1EA" },
   roleRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  roleChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, backgroundColor: "#FAFBFD", borderWidth: 1, borderColor: "#E2E8F0" },
-  roleChipActive: { backgroundColor: "#1E293B", borderColor: "#1E293B" },
-  roleChipText: { color: "#64748B", fontSize: 12, fontWeight: "700", textTransform: "capitalize" },
-  roleChipTextActive: { color: "#fff" },
-  roleChipRed: { backgroundColor: "#FEF2F2", borderColor: "#FECACA" },
-  roleChipTextRed: { color: "#EF4444" },
+  roleChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, backgroundColor: "#EEF1EA", borderWidth: 1, borderColor: "#C7CFC2" },
+  roleChipActive: { backgroundColor: "#16302B", borderColor: "#16302B" },
+  roleChipText: { color: "#4B5C50", fontSize: 12, fontWeight: "700", textTransform: "capitalize" },
+  roleChipTextActive: { color: "#EEF1EA" },
+  roleChipRed: { backgroundColor: "#F1E3DE", borderColor: "#D9B3A8" },
+  roleChipTextRed: { color: "#9C3B2E" },
   modalActions: { flexDirection: "row", gap: 12, marginTop: 12 },
-  cancelBtn: { flex: 1, height: 46, borderRadius: 12, borderWidth: 1, borderColor: "#E2E8F0", alignItems: "center", justifyContent: "center" },
-  cancelText: { color: "#64748B", fontWeight: "700", fontSize: 13 },
-  saveBtn: { flex: 2, height: 46, borderRadius: 12, backgroundColor: "#3B82F6", alignItems: "center", justifyContent: "center" },
-  saveText: { color: "#fff", fontWeight: "700", fontSize: 13 },
+  cancelBtn: { flex: 1, height: 46, borderRadius: 12, borderWidth: 1, borderColor: "#C7CFC2", alignItems: "center", justifyContent: "center" },
+  cancelText: { color: "#4B5C50", fontWeight: "700", fontSize: 13 },
+  saveBtn: { flex: 2, height: 46, borderRadius: 12, backgroundColor: "#16302B", alignItems: "center", justifyContent: "center" },
+  saveText: { color: "#EEF1EA", fontWeight: "700", fontSize: 13 },
   mobileUserCard: {
-    backgroundColor: "#fff",
+    backgroundColor: "#FBFCF9",
     borderRadius: 12,
     padding: 14,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: "#C7CFC2",
     marginBottom: 4,
-    gap: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 1,
+    gap: 12
   },
   mobileUserTop: {
     flexDirection: "row",
@@ -694,7 +756,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     borderTopWidth: 1,
-    borderTopColor: "#F1F5F9",
+    borderTopColor: "#EEF1EA",
     paddingTop: 10,
   },
   mobileBadgesRow: {

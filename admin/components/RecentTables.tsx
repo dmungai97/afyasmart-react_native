@@ -2,10 +2,10 @@ import { Ionicons } from "@expo/vector-icons";
 import { StyleSheet, Text, View } from "react-native";
 import { AdminRecentUser, AdminTransaction } from "@admin/services/admin.service";
 
-const SLATE_DARK = "#1E293B";
-const SLATE_MID = "#475569";
-const SLATE_LIGHT = "#94A3B8";
-const BORDER = "#E2E8F0";
+const SLATE_DARK = "#16302B";
+const SLATE_MID = "#4B5C50";
+const SLATE_LIGHT = "#6B7A70";
+const BORDER = "#C7CFC2";
 
 interface RecentTablesProps {
   recentUsers: AdminRecentUser[];
@@ -152,18 +152,13 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   panel: {
-    backgroundColor: "#fff",
+    backgroundColor: "#FBFCF9",
     borderRadius: 12,
     padding: 20,
     borderWidth: 1,
     borderColor: BORDER,
     flexGrow: 1,
-    flexBasis: 292,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 1,
+    flexBasis: 292
   },
   panelMobile: {
     flexBasis: "100%",
@@ -182,14 +177,14 @@ const styles = StyleSheet.create({
   },
   panelTitle: { color: SLATE_DARK, fontSize: 16, fontWeight: "700" },
   panelSub: { color: SLATE_LIGHT, fontSize: 11, fontWeight: "500", marginTop: 2 },
-  linkText: { color: "#3B82F6", fontSize: 12, fontWeight: "600" },
+  linkText: { color: "#16302B", fontSize: 12, fontWeight: "600" },
   rowsContainer: {},
   row: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "#F1F5F9",
+    borderBottomColor: "#EEF1EA",
     paddingVertical: 10,
   },
   rowMobile: {
@@ -199,7 +194,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: "#F1F5F9",
+    backgroundColor: "#EEF1EA",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -212,7 +207,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: "#F1F5F9",
+    backgroundColor: "#EEF1EA",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -221,14 +216,14 @@ const styles = StyleSheet.create({
   rowSub: { color: SLATE_LIGHT, fontSize: 11, marginTop: 2, fontWeight: "500" },
   badgeActive: {
     borderRadius: 20,
-    backgroundColor: "#F1F5F9",
+    backgroundColor: "#EEF1EA",
     paddingHorizontal: 8,
     paddingVertical: 3,
   },
   badgeTextActive: { color: SLATE_DARK, fontSize: 10, fontWeight: "600" },
   badgeFree: {
     borderRadius: 20,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#EEF1EA",
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderWidth: 1,
@@ -250,14 +245,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "#F1F5F9",
+    borderBottomColor: "#EEF1EA",
     paddingVertical: 10,
   },
   rankBadge: {
     width: 24,
     height: 24,
     borderRadius: 6,
-    backgroundColor: "#F1F5F9",
+    backgroundColor: "#EEF1EA",
     alignItems: "center",
     justifyContent: "center",
   },

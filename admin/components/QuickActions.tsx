@@ -2,10 +2,10 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from "react-native";
 
-const SLATE_DARK = "#1E293B";
-const SLATE_MID = "#475569";
-const SLATE_LIGHT = "#94A3B8";
-const BORDER = "#E2E8F0";
+const SLATE_DARK = "#16302B";
+const SLATE_MID = "#4B5C50";
+const SLATE_LIGHT = "#6B7A70";
+const BORDER = "#C7CFC2";
 
 const STRINGS = {
   quickActions: "Quick Actions",
@@ -73,17 +73,12 @@ export default function QuickActions() {
 
 const styles = StyleSheet.create({
   quickActions: {
-    backgroundColor: "#fff",
+    backgroundColor: "#FBFCF9",
     borderRadius: 12,
     borderWidth: 1,
     borderColor: BORDER,
     padding: 20,
     gap: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 1,
     width: "100%",
   },
   quickHeader: {
@@ -105,19 +100,19 @@ const styles = StyleSheet.create({
     flexBasis: 240,
     minHeight: 64,
     borderRadius: 10,
-    backgroundColor: "#FAFBFD",
+    backgroundColor: "#EEF1EA",
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
     padding: 12,
     borderWidth: 1,
-    borderColor: "#F1F5F9",
+    borderColor: "#EEF1EA",
   },
   actionIcon: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: "#F1F5F9",
+    backgroundColor: "#EEF1EA",
     alignItems: "center",
     justifyContent: "center",
   },

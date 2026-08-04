@@ -1,10 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
-const SLATE_DARK = "#1E293B";
-const SLATE_MID = "#475569";
-const SLATE_LIGHT = "#94A3B8";
-const BORDER = "#E2E8F0";
+const SLATE_DARK = "#16302B";
+const SLATE_MID = "#4B5C50";
+const SLATE_LIGHT = "#6B7A70";
+const BORDER = "#C7CFC2";
 
 type IconName = keyof typeof Ionicons.glyphMap;
 
@@ -62,7 +62,7 @@ export default function FacilitiesOverview({
         </View>
         <TouchableOpacity style={styles.viewButton} onPress={() => {}} activeOpacity={0.7}>
           <Text style={styles.viewButtonText}>View All Facilities</Text>
-          <Ionicons name="chevron-forward" size={14} color="#3B82F6" />
+          <Ionicons name="chevron-forward" size={14} color="#16302B" />
         </TouchableOpacity>
       </View>
 
@@ -100,18 +100,13 @@ export default function FacilitiesOverview({
 
 const styles = StyleSheet.create({
   panel: {
-    backgroundColor: "#fff",
+    backgroundColor: "#FBFCF9",
     borderRadius: 12,
     padding: 20,
     borderWidth: 1,
     borderColor: BORDER,
     flexGrow: 1,
-    flexBasis: 320,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 1,
+    flexBasis: 320
   },
   facilitiesPanel: { flexBasis: 360 },
   statusPanel: { flexBasis: 300 },
@@ -127,7 +122,7 @@ const styles = StyleSheet.create({
   donutContainer: {
     padding: 8,
     borderRadius: 72,
-    backgroundColor: "#FAFBFD",
+    backgroundColor: "#EEF1EA",
     borderWidth: 1,
     borderColor: BORDER,
   },
@@ -139,7 +134,7 @@ const styles = StyleSheet.create({
     borderColor: SLATE_DARK,
     borderLeftColor: SLATE_LIGHT,
     borderTopColor: SLATE_LIGHT,
-    borderBottomColor: "#E2E8F0",
+    borderBottomColor: "#C7CFC2",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -158,13 +153,13 @@ const styles = StyleSheet.create({
     marginTop: 14,
     paddingVertical: 8,
   },
-  viewButtonText: { color: "#3B82F6", fontSize: 13, fontWeight: "600" },
+  viewButtonText: { color: "#16302B", fontSize: 13, fontWeight: "600" },
   statusList: {},
   statusRow: {
     flexDirection: "row",
     alignItems: "center",
     borderBottomWidth: 1,
-    borderBottomColor: "#F1F5F9",
+    borderBottomColor: "#EEF1EA",
     paddingVertical: 12,
   },
   statusIcon: {

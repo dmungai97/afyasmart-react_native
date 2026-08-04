@@ -20,14 +20,14 @@ import RecentTables from "../components/RecentTables";
 import { useAdminDashboard } from "../hooks/useAdminDashboard";
 import { useAuthStore } from "@/src/store/authStore";
 
-const SLATE_DARK = "#1E293B";
-const BLUE = "#3B82F6";
-const GREEN = "#10B981";
-const PURPLE = "#8B5CF6";
-const ORANGE = "#F59E0B";
-const RED = "#EF4444";
-const CYAN = "#06B6D4";
-const BORDER = "#F1F5F9";
+const SLATE_DARK = "#16302B";
+const BLUE = "#16302B";
+const GREEN = "#3F7A5C";
+const PURPLE = "#6B8F82";
+const ORANGE = "#C9A227";
+const RED = "#9C3B2E";
+const CYAN = "#6B7A70";
+const BORDER = "#EEF1EA";
 
 const formatNumber = (value: number) =>
   new Intl.NumberFormat("en-KE").format(value);
@@ -132,12 +132,12 @@ export default function AdminDashboardScreen() {
                 onPress={() => setMenuOpen(true)}
                 activeOpacity={0.7}
               >
-                <Ionicons name="menu-outline" size={24} color="#0B0F19" />
+                <Ionicons name="menu-outline" size={24} color="#16302B" />
               </TouchableOpacity>
             )}
             {!isMobile && (
               <View style={styles.iconContainer}>
-                <Ionicons name="apps" size={20} color="#3B82F6" />
+                <Ionicons name="apps" size={20} color="#16302B" />
               </View>
             )}
             <View style={styles.headerTitleWrap}>
@@ -166,10 +166,10 @@ export default function AdminDashboardScreen() {
             ) : null}
             <TouchableOpacity style={[styles.datePill, isMobile && { paddingHorizontal: 10 }]} activeOpacity={0.8}>
               {!isMobile && <Text style={styles.dateText}>{STRINGS.liveUpdates}</Text>}
-              <Ionicons name="flash" size={14} color="#F59E0B" />
+              <Ionicons name="flash" size={14} color="#C9A227" />
             </TouchableOpacity>
             <TouchableOpacity style={styles.bell} activeOpacity={0.8}>
-              <Ionicons name="notifications-outline" size={18} color="#0B0F19" />
+              <Ionicons name="notifications-outline" size={18} color="#16302B" />
               <View style={styles.dot} />
             </TouchableOpacity>
           </View>
@@ -268,7 +268,7 @@ export default function AdminDashboardScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, flexDirection: "row", backgroundColor: "#F8FAFC" },
+  root: { flex: 1, flexDirection: "row", backgroundColor: "#EEF1EA" },
   main: { flex: 1 },
   content: { padding: 24, gap: 24 },
   topbar: {
@@ -286,21 +286,17 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 12,
-    backgroundColor: "#fff",
+    backgroundColor: "#FBFCF9",
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
     borderColor: BORDER,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
   },
   menuBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 10,
-    backgroundColor: "#fff",
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: "#FBFCF9",
     borderWidth: 1,
     borderColor: BORDER,
     alignItems: "center",
@@ -319,13 +315,13 @@ const styles = StyleSheet.create({
     minWidth: 0,
     flexWrap: "wrap",
   },
-  title: { color: "#1E293B", fontSize: 24, fontWeight: "700" },
+  title: { color: "#16302B", fontSize: 24, fontWeight: "700" },
   titleMobile: { fontSize: 21 },
   liveContainer: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    backgroundColor: "#F1F5F9",
+    backgroundColor: "#EEF1EA",
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 20,
@@ -336,7 +332,7 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: "rgba(22, 163, 74, 0.2)",
+    backgroundColor: "rgba(63, 122, 92, 0.2)",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -344,43 +340,43 @@ const styles = StyleSheet.create({
     width: 4,
     height: 4,
     borderRadius: 2,
-    backgroundColor: "#16A34A",
+    backgroundColor: "#3F7A5C",
   },
-  liveText: { color: "#16A34A", fontSize: 9, fontWeight: "700", textTransform: "uppercase" },
-  subtitle: { color: "#64748B", fontSize: 13, marginTop: 4, fontWeight: "500" },
+  liveText: { color: "#3F7A5C", fontSize: 9, fontWeight: "700", textTransform: "uppercase" },
+  subtitle: { color: "#4B5C50", fontSize: 13, marginTop: 4, fontWeight: "500" },
   topActions: { flexDirection: "row", alignItems: "center", gap: 10 },
   topActionsMobile: { gap: 8 },
   loadingPill: {
     height: 38,
     borderWidth: 1,
     borderColor: BORDER,
-    backgroundColor: "#fff",
+    backgroundColor: "#FBFCF9",
     borderRadius: 10,
     paddingHorizontal: 12,
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
   },
-  loadingText: { color: "#64748B", fontSize: 11, fontWeight: "600" },
+  loadingText: { color: "#4B5C50", fontSize: 11, fontWeight: "600" },
   datePill: {
-    height: 38,
+    height: 44,
     borderWidth: 1,
     borderColor: BORDER,
-    backgroundColor: "#fff",
-    borderRadius: 10,
+    backgroundColor: "#FBFCF9",
+    borderRadius: 12,
     paddingHorizontal: 12,
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
   },
-  dateText: { color: "#1E293B", fontSize: 12, fontWeight: "600" },
+  dateText: { color: "#16302B", fontSize: 12, fontWeight: "600" },
   bell: {
-    width: 38,
-    height: 38,
-    borderRadius: 10,
+    width: 44,
+    height: 44,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#fff",
+    backgroundColor: "#FBFCF9",
     borderWidth: 1,
     borderColor: BORDER,
   },
@@ -391,27 +387,27 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: "#EF4444",
+    backgroundColor: "#9C3B2E",
     borderWidth: 1.5,
-    borderColor: "#fff",
+    borderColor: "#FBFCF9",
   },
   metricsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 16, width: "100%" },
   metricsGridMobile: { gap: 8 },
   errorBanner: {
-    backgroundColor: "#FEF2F2",
+    backgroundColor: "#F1E3DE",
     borderWidth: 1,
-    borderColor: "#FECACA",
+    borderColor: "#D9B3A8",
     borderRadius: 12,
     padding: 12,
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
   },
-  errorText: { color: "#991B1B", fontSize: 12, fontWeight: "600", flex: 1 },
+  errorText: { color: "#9C3B2E", fontSize: 12, fontWeight: "600", flex: 1 },
   overviewGrid: { flexDirection: "row", flexWrap: "wrap", gap: 16, width: "100%" },
   overviewGridMobile: { gap: 12 },
   summary: {
-    backgroundColor: "#fff",
+    backgroundColor: "#FBFCF9",
     borderRadius: 12,
     padding: 20,
     flexDirection: "row",
@@ -419,12 +415,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 24,
     borderWidth: 1,
-    borderColor: BORDER,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 1,
+    borderColor: BORDER
   },
   summaryIntro: {
     flexDirection: "row",
@@ -437,12 +428,12 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: "#F1F5F9",
+    backgroundColor: "#EEF1EA",
     alignItems: "center",
     justifyContent: "center",
   },
-  summaryTitle: { color: "#1E293B", fontSize: 16, fontWeight: "700" },
-  summarySub: { color: "#64748B", fontSize: 11, marginTop: 4, fontWeight: "500" },
+  summaryTitle: { color: "#16302B", fontSize: 16, fontWeight: "700" },
+  summarySub: { color: "#4B5C50", fontSize: 11, marginTop: 4, fontWeight: "500" },
   summaryMetricGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -458,8 +449,8 @@ const styles = StyleSheet.create({
     paddingLeft: 16,
     paddingVertical: 4,
   },
-  summaryLabel: { color: "#64748B", fontSize: 11, fontWeight: "600" },
-  summaryValue: { color: "#1E293B", fontSize: 20, fontWeight: "700", marginTop: 4, letterSpacing: -0.5 },
+  summaryLabel: { color: "#4B5C50", fontSize: 11, fontWeight: "600" },
+  summaryValue: { color: "#16302B", fontSize: 20, fontWeight: "700", marginTop: 4, letterSpacing: -0.5 },
   summaryMobile: {
     flexDirection: "column",
     alignItems: "stretch",
@@ -474,7 +465,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   summaryMetricMobile: {
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#EEF1EA",
     borderRadius: 8,
     padding: 10,
     flexBasis: "48%",

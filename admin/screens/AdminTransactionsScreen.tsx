@@ -13,22 +13,23 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import type { DocumentData, QueryDocumentSnapshot } from "firebase/firestore";
 import Sidebar from "../components/Sidebar";
 import {
   AdminPayment,
-  fetchAllPayments,
+  fetchPaymentsPage,
   reconcilePayment,
   rejectPayment,
 } from "@admin/services/admin.service";
 import { useAuthStore } from "@/src/store/authStore";
 
-const BLUE = "#3B82F6";
-const GREEN = "#10B981";
-const RED = "#EF4444";
-const ORANGE = "#F59E0B";
-const BORDER = "#E2E8F0";
-const NAVY = "#1E293B";
-const MUTED = "#64748B";
+const BLUE = "#16302B";
+const GREEN = "#3F7A5C";
+const RED = "#9C3B2E";
+const ORANGE = "#C9A227";
+const BORDER = "#C7CFC2";
+const NAVY = "#16302B";
+const MUTED = "#4B5C50";
 
 const STRINGS = {
   title: "Transactions",
@@ -67,6 +68,10 @@ export default function AdminTransactionsScreen() {
   const [payments, setPayments] = useState<AdminPayment[]>([]);
   const [filtered, setFiltered] = useState<AdminPayment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [cursor, setCursor] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [activeFilter, setActiveFilter] = useState<"all" | "paid" | "pending" | "other">("all");
   const [reconciling, setReconciling] = useState<string | null>(null);
@@ -82,7 +87,7 @@ export default function AdminTransactionsScreen() {
           onPress: async () => {
             setReconciling(p.id);
             try {
-              await reconcilePayment(p.id, p.uid, p.plan);
+              await reconcilePayment(p.id);
               await load();
             } catch (err) {
               console.error("Reconcile payment error:", err);
@@ -131,14 +136,38 @@ export default function AdminTransactionsScreen() {
 
   const load = async () => {
     setLoading(true);
+    setError(null);
     try {
-      const data = await fetchAllPayments();
-      setPayments(data);
-      setFiltered(data);
-    } catch {
+      const page = await fetchPaymentsPage();
+      setPayments(page.items);
+      setCursor(page.cursor);
+      setHasMore(page.hasMore);
+    } catch (err: any) {
       setPayments([]);
+      setCursor(null);
+      setHasMore(false);
+      setError(err?.message ?? "Failed to load transactions. Pull to refresh to try again.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  // KPI totals below are computed from whatever's loaded so far, not the
+  // whole platform — accurate once hasMore is false, an undercount otherwise
+  // ("Load more" to see the running total grow). AdminDashboardScreen shows
+  // the true platform-wide total revenue if you need that instead.
+  const loadMore = async () => {
+    if (!hasMore || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const page = await fetchPaymentsPage(cursor);
+      setPayments((prev) => [...prev, ...page.items]);
+      setCursor(page.cursor);
+      setHasMore(page.hasMore);
+    } catch (err: any) {
+      setError(err?.message ?? "Failed to load more transactions.");
+    } finally {
+      setLoadingMore(false);
     }
   };
 
@@ -173,9 +202,9 @@ export default function AdminTransactionsScreen() {
   };
 
   const statusBg = (p: AdminPayment) => {
-    if (p.paid) return "#ECFDF5";
-    if (p.status === "pending") return "#FFFBEB";
-    return "#FEF2F2";
+    if (p.paid) return "#E4EAE0";
+    if (p.status === "pending") return "#F4EBD3";
+    return "#F1E3DE";
   };
 
   const statusLabel = (p: AdminPayment) => {
@@ -219,7 +248,7 @@ export default function AdminTransactionsScreen() {
           <View style={styles.titleRow}>
             {isMobile && (
               <TouchableOpacity style={styles.menuBtn} onPress={() => setMenuOpen(true)} activeOpacity={0.7}>
-                <Ionicons name="menu-outline" size={24} color="#1E293B" />
+                <Ionicons name="menu-outline" size={24} color="#16302B" />
               </TouchableOpacity>
             )}
             <View style={styles.backBtnWrap}>
@@ -234,7 +263,7 @@ export default function AdminTransactionsScreen() {
                 }}
                 activeOpacity={0.7}
               >
-                <Ionicons name="arrow-back" size={18} color="#1E293B" />
+                <Ionicons name="arrow-back" size={18} color="#16302B" />
               </TouchableOpacity>
             </View>
             <View style={styles.titleTextWrap}>
@@ -243,11 +272,21 @@ export default function AdminTransactionsScreen() {
             </View>
           </View>
           <TouchableOpacity style={styles.refreshBtn} onPress={load} activeOpacity={0.8}>
-            <Ionicons name="refresh-outline" size={18} color="#1E293B" />
+            <Ionicons name="refresh-outline" size={18} color="#16302B" />
           </TouchableOpacity>
         </View>
 
+        {error ? (
+          <View style={styles.errorBanner}>
+            <Ionicons name="alert-circle-outline" size={18} color={RED} />
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        ) : null}
+
         {/* KPI Summary */}
+        {hasMore ? (
+          <Text style={styles.kpiCaveat}>Totals reflect the {payments.length} transactions loaded so far — load more to see the full total.</Text>
+        ) : null}
         <View style={[styles.kpiRow, isMobile && styles.kpiRowMobile]}>
           <View style={[styles.kpiCard, isMobile && styles.kpiCardMobile]}>
             <View style={styles.kpiContent}>
@@ -255,7 +294,7 @@ export default function AdminTransactionsScreen() {
               <Text style={styles.kpiValue}>{formatMoney(totalRevenue)}</Text>
             </View>
             <View style={styles.kpiIcon}>
-              <Ionicons name="wallet" size={20} color="#475569" />
+              <Ionicons name="wallet" size={20} color="#4B5C50" />
             </View>
           </View>
           <View style={[styles.kpiCard, isMobile && styles.kpiCardMobile]}>
@@ -264,7 +303,7 @@ export default function AdminTransactionsScreen() {
               <Text style={styles.kpiValue}>{totalPaid}</Text>
             </View>
             <View style={styles.kpiIcon}>
-              <Ionicons name="checkmark-circle" size={20} color="#475569" />
+              <Ionicons name="checkmark-circle" size={20} color="#4B5C50" />
             </View>
           </View>
           <View style={[styles.kpiCard, isMobile && styles.kpiCardMobile]}>
@@ -273,7 +312,7 @@ export default function AdminTransactionsScreen() {
               <Text style={styles.kpiValue}>{totalPending}</Text>
             </View>
             <View style={styles.kpiIcon}>
-              <Ionicons name="time" size={20} color="#475569" />
+              <Ionicons name="time" size={20} color="#4B5C50" />
             </View>
           </View>
         </View>
@@ -309,7 +348,7 @@ export default function AdminTransactionsScreen() {
 
         {/* Table */}
         {loading ? (
-          <ActivityIndicator size="large" color="#1E293B" style={{ marginTop: 40 }} />
+          <ActivityIndicator size="large" color="#16302B" style={{ marginTop: 40 }} />
         ) : filtered.length === 0 ? (
           <View style={styles.empty}>
             <Ionicons name="receipt-outline" size={48} color={MUTED} />
@@ -341,10 +380,10 @@ export default function AdminTransactionsScreen() {
                       disabled={reconciling === p.id || rejecting === p.id}
                     >
                       {reconciling === p.id ? (
-                        <ActivityIndicator size="small" color="#fff" />
+                        <ActivityIndicator size="small" color="#EEF1EA" />
                       ) : (
                         <>
-                          <Ionicons name="checkmark-circle-outline" size={14} color="#fff" />
+                          <Ionicons name="checkmark-circle-outline" size={14} color="#EEF1EA" />
                           <Text style={styles.reconcileBtnText}>Approve</Text>
                         </>
                       )}
@@ -357,10 +396,10 @@ export default function AdminTransactionsScreen() {
                         disabled={reconciling === p.id || rejecting === p.id}
                       >
                         {rejecting === p.id ? (
-                          <ActivityIndicator size="small" color="#fff" />
+                          <ActivityIndicator size="small" color="#EEF1EA" />
                         ) : (
                           <>
-                            <Ionicons name="close-circle-outline" size={14} color="#fff" />
+                            <Ionicons name="close-circle-outline" size={14} color="#EEF1EA" />
                             <Text style={styles.reconcileBtnText}>Cancel</Text>
                           </>
                         )}
@@ -388,7 +427,7 @@ export default function AdminTransactionsScreen() {
                   <Text style={styles.cellSub}>{p.createdAt}</Text>
                 </View>
                 <Text style={[styles.tdCell, { textTransform: "capitalize" }]}>{p.plan}</Text>
-                <Text style={[styles.tdCell, { color: "#1E293B", fontWeight: "600" }]}>{formatMoney(p.amount)}</Text>
+                <Text style={[styles.tdCell, { color: "#16302B", fontWeight: "600" }]}>{formatMoney(p.amount)}</Text>
                 <View style={{ flex: 1, flexDirection: "row", alignItems: "center" }}>
                   <View style={[styles.statusBadge, { backgroundColor: statusBg(p), borderColor: statusColor(p) + "30" }]}>
                     <Text style={[styles.statusText, { color: statusColor(p) }]}>{statusLabel(p)}</Text>
@@ -430,13 +469,23 @@ export default function AdminTransactionsScreen() {
             ))}
           </View>
         )}
+
+        {!loading && hasMore ? (
+          <TouchableOpacity style={styles.loadMoreBtn} onPress={loadMore} disabled={loadingMore} activeOpacity={0.7}>
+            {loadingMore ? (
+              <ActivityIndicator size="small" color="#16302B" />
+            ) : (
+              <Text style={styles.loadMoreText}>Load more transactions</Text>
+            )}
+          </TouchableOpacity>
+        ) : null}
       </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, flexDirection: "row", backgroundColor: "#F8FAFC" },
+  root: { flex: 1, flexDirection: "row", backgroundColor: "#EEF1EA" },
   main: { flex: 1 },
   content: { padding: 24, gap: 16 },
   topbar: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
@@ -447,7 +496,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 10,
-    backgroundColor: "#fff",
+    backgroundColor: "#FBFCF9",
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
@@ -456,52 +505,69 @@ const styles = StyleSheet.create({
   backBtn: {
     padding: 6,
   },
-  menuBtn: { width: 38, height: 38, borderRadius: 10, backgroundColor: "#fff", borderWidth: 1, borderColor: BORDER, alignItems: "center", justifyContent: "center" },
-  title: { color: "#1E293B", fontSize: 24, fontWeight: "700" },
+  menuBtn: { width: 44, height: 44, borderRadius: 12, backgroundColor: "#FBFCF9", borderWidth: 1, borderColor: BORDER, alignItems: "center", justifyContent: "center" },
+  title: { color: "#16302B", fontSize: 24, fontWeight: "700" },
   titleMobile: { fontSize: 20 },
   subtitle: { color: MUTED, fontSize: 13, marginTop: 4, fontWeight: "500" },
-  refreshBtn: { width: 38, height: 38, borderRadius: 10, backgroundColor: "#fff", borderWidth: 1, borderColor: BORDER, alignItems: "center", justifyContent: "center" },
+  refreshBtn: { width: 44, height: 44, borderRadius: 12, backgroundColor: "#FBFCF9", borderWidth: 1, borderColor: BORDER, alignItems: "center", justifyContent: "center" },
   kpiRow: { flexDirection: "row", gap: 12, flexWrap: "wrap" },
   kpiRowMobile: { gap: 8 },
-  kpiCard: { flex: 1, minWidth: 140, backgroundColor: "#fff", borderRadius: 12, padding: 18, borderWidth: 1, borderColor: BORDER, flexDirection: "row", alignItems: "center", justifyContent: "space-between", shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 8, elevation: 1 },
+  kpiCard: { flex: 1, minWidth: 140, backgroundColor: "#FBFCF9", borderRadius: 12, padding: 18, borderWidth: 1, borderColor: BORDER, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   kpiCardMobile: { flexBasis: "100%", minWidth: 0, padding: 12 },
   kpiContent: { flex: 1, paddingRight: 10 },
   kpiLabel: { color: MUTED, fontSize: 10, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.6 },
-  kpiValue: { color: "#1E293B", fontSize: 22, fontWeight: "700", marginTop: 6, letterSpacing: -0.5 },
-  kpiIcon: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center", backgroundColor: "#F1F5F9" },
-  searchRow: { flexDirection: "row", alignItems: "center", backgroundColor: "#fff", borderRadius: 10, borderWidth: 1, borderColor: BORDER, height: 44, gap: 8 },
-  searchInput: { flex: 1, color: "#1E293B", fontSize: 13, fontWeight: "500", paddingRight: 12 },
+  kpiValue: { color: "#16302B", fontSize: 22, fontWeight: "700", marginTop: 6, letterSpacing: -0.5 },
+  kpiIcon: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center", backgroundColor: "#EEF1EA" },
+  errorBanner: {
+    backgroundColor: "#F1E3DE",
+    borderWidth: 1,
+    borderColor: "#D9B3A8",
+    borderRadius: 12,
+    padding: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  errorText: { color: "#9C3B2E", fontSize: 12, fontWeight: "600", flex: 1 },
+  kpiCaveat: { color: MUTED, fontSize: 11, fontWeight: "500", fontStyle: "italic" },
+  loadMoreBtn: {
+    height: 44,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: BORDER,
+    backgroundColor: "#FBFCF9",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  loadMoreText: { color: "#16302B", fontSize: 13, fontWeight: "700" },
+  searchRow: { flexDirection: "row", alignItems: "center", backgroundColor: "#FBFCF9", borderRadius: 10, borderWidth: 1, borderColor: BORDER, height: 44, gap: 8 },
+  searchInput: { flex: 1, color: "#16302B", fontSize: 13, fontWeight: "500", paddingRight: 12 },
   filterRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, alignItems: "center" },
-  filterChip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: "#fff", borderWidth: 1, borderColor: BORDER },
-  filterChipActive: { backgroundColor: "#1E293B", borderColor: "#1E293B" },
+  filterChip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: "#FBFCF9", borderWidth: 1, borderColor: BORDER },
+  filterChipActive: { backgroundColor: "#16302B", borderColor: "#16302B" },
   filterChipText: { color: MUTED, fontSize: 12, fontWeight: "600" },
-  filterChipTextActive: { color: "#fff" },
+  filterChipTextActive: { color: "#EEF1EA" },
   countText: { color: MUTED, fontSize: 11, fontWeight: "600", marginLeft: "auto" },
   empty: { alignItems: "center", paddingTop: 60, gap: 12 },
   emptyText: { color: MUTED, fontSize: 15, fontWeight: "600" },
-  table: { backgroundColor: "#fff", borderRadius: 12, borderWidth: 1, borderColor: BORDER, overflow: "hidden", shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 8, elevation: 1 },
-  tableHeader: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 12, backgroundColor: "#F8FAFC", borderBottomWidth: 1, borderBottomColor: BORDER },
+  table: { backgroundColor: "#FBFCF9", borderRadius: 12, borderWidth: 1, borderColor: BORDER, overflow: "hidden" },
+  tableHeader: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 12, backgroundColor: "#EEF1EA", borderBottomWidth: 1, borderBottomColor: BORDER },
   thCell: { flex: 1, color: MUTED, fontSize: 10, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.5 },
-  tableRow: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: "#F1F5F9" },
-  tableRowAlt: { backgroundColor: "#FAFBFD" },
-  cellPrimary: { color: "#1E293B", fontSize: 13, fontWeight: "600" },
-  cellSub: { color: "#94A3B8", fontSize: 10, fontWeight: "500", marginTop: 2 },
+  tableRow: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: "#EEF1EA" },
+  tableRowAlt: { backgroundColor: "#EEF1EA" },
+  cellPrimary: { color: "#16302B", fontSize: 13, fontWeight: "600" },
+  cellSub: { color: "#6B7A70", fontSize: 10, fontWeight: "500", marginTop: 2 },
   tdCell: { flex: 1, color: MUTED, fontSize: 12, fontWeight: "600" },
-  statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, borderWidth: 1, borderColor: "#E2E8F0" },
+  statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, borderWidth: 1, borderColor: "#C7CFC2" },
   statusText: { fontSize: 10, fontWeight: "600" },
   mobileList: { gap: 10 },
   mobileCard: {
-    backgroundColor: "#fff",
+    backgroundColor: "#FBFCF9",
     borderRadius: 12,
     padding: 16,
     borderWidth: 1,
     borderColor: BORDER,
-    gap: 8,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 1,
+    gap: 8
   },
   mobileCardHeader: {
     flexDirection: "row",
@@ -513,30 +579,30 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "flex-end",
     borderTopWidth: 1,
-    borderTopColor: "#F1F5F9",
+    borderTopColor: "#EEF1EA",
     paddingTop: 8,
   },
   mobilePhone: {
-    color: "#1E293B",
+    color: "#16302B",
     fontSize: 13,
     fontWeight: "700",
     flex: 1,
     marginRight: 8,
   },
   mobilePlanText: {
-    color: "#475569",
+    color: "#4B5C50",
     fontSize: 12,
     fontWeight: "600",
     textTransform: "capitalize",
   },
   mobileDateText: {
-    color: "#94A3B8",
+    color: "#6B7A70",
     fontSize: 10,
     fontWeight: "500",
     marginTop: 2,
   },
   mobileAmountText: {
-    color: "#1E293B",
+    color: "#16302B",
     fontSize: 14,
     fontWeight: "700",
   },
@@ -544,13 +610,13 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#10B981",
+    backgroundColor: "#3F7A5C",
     borderRadius: 8,
     paddingVertical: 8,
     gap: 6,
   },
   reconcileBtnText: {
-    color: "#fff",
+    color: "#EEF1EA",
     fontSize: 11,
     fontWeight: "700",
   },
@@ -558,11 +624,11 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 6,
-    backgroundColor: "#ECFDF5",
+    backgroundColor: "#E4EAE0",
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    borderColor: "#A7F3D0",
+    borderColor: "#B9C9BC",
   },
   mobileActionsRow: {
     flexDirection: "row",
@@ -582,10 +648,10 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 6,
-    backgroundColor: "#FEF2F2",
+    backgroundColor: "#F1E3DE",
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    borderColor: "#FEE2E2",
+    borderColor: "#D9B3A8",
   },
 });

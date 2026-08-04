@@ -4,8 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { Animated, ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-const DARK_BG = "#1E293B";
-const BRAND_GREEN = "#10B981";
+const DARK_BG = "#16302B";
+const BRAND_GREEN = "#3F7A5C";
 
 type IconName = keyof typeof Ionicons.glyphMap;
 
@@ -95,7 +95,7 @@ function SidebarItem({
       onPress={onPress ?? (() => {})}
       activeOpacity={0.7}
     >
-      <Ionicons name={icon} size={18} color="#fff" style={styles.iconStyle} />
+      <Ionicons name={icon} size={18} color="#EEF1EA" style={styles.iconStyle} />
       <Text style={[styles.sideLabel, active && styles.sideLabelActive]}>{label}</Text>
       {badge ? <Text style={styles.badge}>{badge}</Text> : null}
     </TouchableOpacity>
@@ -171,7 +171,7 @@ export default function Sidebar({
       {isMobile && onClose && (
         <View style={styles.mobileHeader}>
           <TouchableOpacity style={styles.closeBtn} onPress={onClose} activeOpacity={0.7}>
-            <Ionicons name="arrow-back-outline" size={22} color="#fff" />
+            <Ionicons name="arrow-back-outline" size={22} color="#EEF1EA" />
             <Text style={styles.closeText}>Back</Text>
           </TouchableOpacity>
         </View>
@@ -216,7 +216,7 @@ export default function Sidebar({
 
         {/* Logout button at the bottom */}
         <TouchableOpacity style={styles.logoutButton} onPress={onSignOut} activeOpacity={0.7}>
-          <Ionicons name="log-out-outline" size={18} color="#fff" style={styles.iconStyle} />
+          <Ionicons name="log-out-outline" size={18} color="#EEF1EA" style={styles.iconStyle} />
           <Text style={styles.logoutText}>{STRINGS.logout}</Text>
         </TouchableOpacity>
       </ScrollView>
@@ -269,7 +269,7 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
     height: "100%",
     borderRightWidth: 1,
-    borderRightColor: "rgba(255,255,255,0.05)",
+    borderRightColor: "rgba(238,241,234,0.10)",
   },
   sidebarMobile: {
     width: 280,
@@ -286,7 +286,7 @@ const styles = StyleSheet.create({
     top: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: "rgba(11, 15, 25, 0.4)",
+    backgroundColor: "rgba(22, 48, 43, 0.45)",
     zIndex: 998,
     elevation: 9,
   },
@@ -315,7 +315,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   closeText: {
-    color: "#fff",
+    color: "#EEF1EA",
     fontSize: 14,
     fontWeight: "500",
   },
@@ -328,18 +328,18 @@ const styles = StyleSheet.create({
     width: 68,
     height: 68,
     borderRadius: 34,
-    backgroundColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "rgba(238,241,234,0.12)",
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.15)",
+    borderColor: "rgba(238,241,234,0.22)",
   },
-  avatarText: { color: "#fff", fontWeight: "700", fontSize: 24 },
-  profileName: { color: "#fff", fontWeight: "600", fontSize: 16, marginTop: 12 },
-  profileRole: { color: "#94A3B8", fontSize: 11, marginTop: 2, fontWeight: "500" },
+  avatarText: { color: "#EEF1EA", fontWeight: "700", fontSize: 24 },
+  profileName: { color: "#EEF1EA", fontWeight: "600", fontSize: 16, marginTop: 12 },
+  profileRole: { color: "rgba(238,241,234,0.6)", fontSize: 11, marginTop: 2, fontWeight: "500" },
   navGroup: { flex: 1 },
   navHeader: {
-    color: "#64748B",
+    color: "rgba(238,241,234,0.45)",
     fontSize: 9,
     fontWeight: "700",
     marginTop: 18,
@@ -348,7 +348,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1.0,
   },
   sideItem: {
-    minHeight: 40,
+    minHeight: 44,
     borderRadius: 8,
     flexDirection: "row",
     alignItems: "center",
@@ -357,12 +357,12 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   sideItemActive: {
-    backgroundColor: "rgba(255, 255, 255, 0.08)",
+    backgroundColor: "rgba(238,241,234,0.14)",
   },
-  sideLabel: { color: "#E2E8F0", fontSize: 13, fontWeight: "500", flex: 1 },
-  sideLabelActive: { color: "#fff", fontWeight: "600" },
+  sideLabel: { color: "#C7CFC2", fontSize: 13, fontWeight: "500", flex: 1 },
+  sideLabelActive: { color: "#EEF1EA", fontWeight: "600" },
   badge: {
-    color: "#fff",
+    color: "#EEF1EA",
     backgroundColor: BRAND_GREEN,
     overflow: "hidden",
     borderRadius: 10,
@@ -375,7 +375,7 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   logoutButton: {
-    minHeight: 40,
+    minHeight: 44,
     borderRadius: 8,
     flexDirection: "row",
     alignItems: "center",
@@ -384,7 +384,7 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   logoutText: {
-    color: "#fff",
+    color: "#EEF1EA",
     fontSize: 13,
     fontWeight: "500",
   },
