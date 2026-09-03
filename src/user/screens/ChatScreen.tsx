@@ -13,6 +13,7 @@ import { useAuthStore } from '@/src/store/authStore';
 import {
   sendMessage,
   getChatStatus,
+  getChatHistory,
   ChatLimitError,
   ChatStatusResponse,
 } from '@/src/services/chat.service';
@@ -192,6 +193,35 @@ export function ChatScreen() {
     refreshChatStatus();
   }, [refreshChatStatus, user?.is_subscribed, user?.subscription_expires_at]);
 
+  // Loads the real conversation from Firestore once on mount. getChatHistory
+  // existed but nothing ever called it — every reopen of this screen reset
+  // to just the canned greeting, silently discarding a history that was
+  // actually being saved correctly the whole time. Only replaces the
+  // greeting if there's real history; a brand-new chat keeps it.
+  useEffect(() => {
+    let cancelled = false;
+
+    getChatHistory(token)
+      .then((res) => {
+        if (cancelled || res.messages.length === 0) return;
+        setMessages(
+          res.messages.map((m) => ({
+            role: m.role,
+            text: m.text,
+            time: m.time || getTime(),
+          })),
+        );
+      })
+      .catch(() => {
+        // Fall back silently to the canned greeting already in state.
+      });
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
       refreshChatStatus();
@@ -296,7 +326,15 @@ export function ChatScreen() {
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior="padding"
+      // app.json sets android.softwareKeyboardLayoutMode: "resize", which
+      // already makes the OS shrink the window when the keyboard opens.
+      // Also applying KeyboardAvoidingView's padding on Android stacks two
+      // separate compensation mechanisms on top of each other — the classic
+      // cause of the input overshooting, undershooting, or landing behind
+      // the 3-button nav bar inconsistently across devices. Only Android has
+      // that automatic resize — iOS and web both still need the manual
+      // padding here.
+      behavior={Platform.OS === 'android' ? undefined : 'padding'}
       keyboardVerticalOffset={0}
     >
       {/* Header */}
@@ -418,10 +456,18 @@ export function ChatScreen() {
             onSubmitEditing={() => handleSend()}
             blurOnSubmit={false}
             onFocus={() => {
-              setKeyboardShown(true);
+              // Web has no real virtual keyboard — DOM focus fires here on
+              // every platform, but only iOS/Android should treat it as
+              // "the keyboard is now covering part of the screen". Doing
+              // this unconditionally dropped bottomSpacer to 0 on web,
+              // putting the input behind the fixed tab bar the moment it
+              // was clicked.
+              if (Platform.OS !== 'web') setKeyboardShown(true);
               setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 50);
             }}
-            onBlur={() => setKeyboardShown(false)}
+            onBlur={() => {
+              if (Platform.OS !== 'web') setKeyboardShown(false);
+            }}
           />
           <TouchableOpacity
             style={[styles.sendBtn, (!input.trim() || loading) && styles.sendDisabled]}

@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Animated, StatusBar, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { useDiagnosisStore } from "@/src/store/diagnosisStore";
+import { useDiagnosisStore, useDiagnosisHydrated } from "@/src/store/diagnosisStore";
 import { requestSymptomsAnalysis } from "@/src/services/symptoms.service";
 import { PAPER, INK, INK_MUTED, INK_FAINT, ACCENT, RULE, RULE_STRONG, SUCCESS, DANGER } from "../theme";
 
@@ -11,6 +11,7 @@ export function AnalysisLoadingScreen() {
   const pendingAnalysisRequest = useDiagnosisStore((s) => s.pendingAnalysisRequest);
   const setPendingDiagnosis = useDiagnosisStore((s) => s.setPendingDiagnosis);
   const clearPendingAnalysisRequest = useDiagnosisStore((s) => s.clearPendingAnalysisRequest);
+  const diagnosisHydrated = useDiagnosisHydrated();
 
   const [status, setStatus] = useState<"loading" | "error">("loading");
   const [errorMessage, setErrorMessage] = useState("");
@@ -102,10 +103,15 @@ export function AnalysisLoadingScreen() {
   }, [pendingAnalysisRequest, router, setPendingDiagnosis, clearPendingAnalysisRequest, startMotion, stopMotion, progress]);
 
   useEffect(() => {
+    // Wait for the persisted diagnosisStore to finish loading from
+    // AsyncStorage first — otherwise a mount that races ahead of that read
+    // would see pendingAnalysisRequest as null and bounce the user back to
+    // symptom-chat even though their request is about to load a moment later.
+    if (!diagnosisHydrated) return;
     runAnalysis();
     return () => stopMotion();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [diagnosisHydrated]);
 
   const rotate = spin.interpolate({
     inputRange: [0, 1],

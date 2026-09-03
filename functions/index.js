@@ -613,6 +613,15 @@ exports.symptomsAnalyze = onRequest(
                   '    "Actionable advice line 2"\n' +
                   '  ]\n' +
                   '}\n' +
+                  'IMPORTANT — calibrate to how much detail you actually have: if the ' +
+                  'symptom description and any follow-up answers are vague, minimal, or ' +
+                  'just a few words with no specifics (location, sensation, triggers, ' +
+                  'etc.), you MUST use noticeably lower percent values (all under 40) and ' +
+                  'make urgency_desc explicitly say the input was too limited for a ' +
+                  'confident read, encouraging the user to describe their symptoms in ' +
+                  'more detail. Never present specific-sounding conditions or ' +
+                  'medications with high confidence when the underlying description is ' +
+                  'this thin.\n' +
                   'Do not include any text, backticks, or wrapping outside the JSON object.',
               },
               { role: "user", content: prompt },

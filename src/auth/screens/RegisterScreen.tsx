@@ -145,7 +145,10 @@ export function RegisterScreen() {
       return;
     }
 
-    router.replace("/(tabs)" as any);
+    // No explicit redirect for the plain new-registration case — app/_layout.tsx's
+    // own needsOnboarding check already sends a brand-new, not-yet-onboarded user
+    // to /(onboarding)/welcome. Redirecting to /(tabs) here first (as this used to)
+    // raced against that check and caused a visible tabs -> onboarding flash.
   }, [plan, router, setAuth]);
 
   React.useEffect(() => {

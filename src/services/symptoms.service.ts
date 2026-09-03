@@ -43,14 +43,25 @@ type FirebaseExtra = {
   mpesaApiBaseUrl?: string;
   functionsBaseUrl?: string;
   useFirebaseFunctions?: boolean;
+  useSupabaseFunctions?: boolean;
 };
 const extra = (Constants.expoConfig?.extra?.firebase ?? {}) as FirebaseExtra;
 
+// The Supabase "symptoms" Edge Function requires the Blaze-free deployment
+// path Firebase's symptomsAnalyze/symptomsClarify can't use — see
+// mpesa.service.ts for the full reasoning. Takes priority over
+// useFirebaseFunctions the same way.
+const USE_SUPABASE_FUNCTIONS =
+  process.env.EXPO_PUBLIC_USE_SUPABASE_FUNCTIONS === "true" || extra.useSupabaseFunctions === true;
+
 // Toggle this flag to switch between the legacy Laravel API and Firebase Cloud Functions
 const USE_FIREBASE_FUNCTIONS =
-  process.env.EXPO_PUBLIC_USE_FIREBASE_FUNCTIONS === "true" || extra.useFirebaseFunctions === true;
+  !USE_SUPABASE_FUNCTIONS &&
+  (process.env.EXPO_PUBLIC_USE_FIREBASE_FUNCTIONS === "true" || extra.useFirebaseFunctions === true);
 
-const symptomsApiBaseUrl = USE_FIREBASE_FUNCTIONS
+const symptomsApiBaseUrl = USE_SUPABASE_FUNCTIONS
+  ? (process.env.EXPO_PUBLIC_SUPABASE_FUNCTIONS_BASE_URL ?? extra.mpesaApiBaseUrl ?? "https://afyasmart-ey9q.onrender.com/api/v1")
+  : USE_FIREBASE_FUNCTIONS
   ? (process.env.EXPO_PUBLIC_FUNCTIONS_BASE_URL ?? extra.functionsBaseUrl ?? "https://us-central1-afya-smart-377ad.cloudfunctions.net")
   : (process.env.EXPO_PUBLIC_MPESA_API_BASE_URL ?? extra.mpesaApiBaseUrl ?? "https://afyasmart-ey9q.onrender.com/api/v1");
 
@@ -97,25 +108,27 @@ export const requestSymptomsAnalysis = async (
   throw new Error("Invalid response format received from the server.");
 };
 
-// Best-effort — only available on the Firebase Functions path, and fails
-// safe to `{ done: true }` on any error so a flaky/unreachable endpoint never
-// blocks the onboarding funnel. Callers should treat a missing `duration` on
-// a `done: true` result as "clarification wasn't available", not "the user
-// has no symptom duration".
+// Best-effort — only available on the Firebase Functions and Supabase Edge
+// Function paths, and fails safe to `{ done: true }` on any error so a
+// flaky/unreachable endpoint never blocks the onboarding funnel. Callers
+// should treat a missing `duration` on a `done: true` result as
+// "clarification wasn't available", not "the user has no symptom duration".
 export const requestSymptomsClarification = async (params: {
   symptom: string;
   age: number;
   severity: string;
   history: { question: string; answer: string }[];
 }): Promise<SymptomsClarifyResponse> => {
-  if (!USE_FIREBASE_FUNCTIONS) {
+  if (!USE_FIREBASE_FUNCTIONS && !USE_SUPABASE_FUNCTIONS) {
     return { done: true };
   }
+
+  const clarifyPath = USE_FIREBASE_FUNCTIONS ? "/symptomsClarify" : "/symptoms/clarify";
 
   try {
     const firebase_uid = await resolveFirebaseUid();
 
-    const response = await fetch(`${symptomsApiBaseUrl}/symptomsClarify`, {
+    const response = await fetch(`${symptomsApiBaseUrl}${clarifyPath}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ firebase_uid, ...params }),

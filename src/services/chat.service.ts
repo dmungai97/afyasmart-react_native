@@ -1,3 +1,4 @@
+import Constants from "expo-constants";
 import {
   collection,
   getDocs,
@@ -13,9 +14,28 @@ import {
   isSubscriptionActive,
 } from "./subscription.model";
 
+type FirebaseExtra = {
+  mpesaApiBaseUrl?: string;
+  useSupabaseFunctions?: boolean;
+};
+const extra = (Constants.expoConfig?.extra?.firebase ?? {}) as FirebaseExtra;
+
+// chatSend went through Firebase Cloud Functions (via callFunction below),
+// which requires the Blaze billing plan to deploy at all. The Supabase
+// "chat" Edge Function (supabase/functions/chat) covers the same route —
+// see mpesa.service.ts for the same reasoning. Reuses the mpesaApiBaseUrl
+// field since it's really "the non-Firebase functions base URL" now, shared
+// across mpesa/symptoms/chat.
+const USE_SUPABASE_FUNCTIONS =
+  process.env.EXPO_PUBLIC_USE_SUPABASE_FUNCTIONS === "true" || extra.useSupabaseFunctions === true;
+
+const supabaseFunctionsBaseUrl =
+  process.env.EXPO_PUBLIC_SUPABASE_FUNCTIONS_BASE_URL ?? extra.mpesaApiBaseUrl ?? "";
+
 export interface ChatMessage {
   role: "user" | "ai";
   text: string;
+  time?: string;
 }
 
 export interface SendMessageResponse {
@@ -91,17 +111,48 @@ export const sendMessage = async (
     throw new ChatLimitError();
   }
 
-  // Delegate AI reply to the chatSend Cloud Function (OpenAI key stays server-side)
+  // Delegate AI reply to the chat backend (OpenAI key stays server-side)
   try {
+    if (USE_SUPABASE_FUNCTIONS) {
+      const idToken = await firebaseAuth.currentUser?.getIdToken();
+      const response = await fetch(`${supabaseFunctionsBaseUrl}/chat/send`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
+        },
+        body: JSON.stringify({ message, history }),
+      });
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        if (response.status === 403 && data?.limit_reached) {
+          throw new ChatLimitError();
+        }
+        throw new Error(data?.message ?? "Chat request failed.");
+      }
+
+      return data as SendMessageResponse;
+    }
+
     return await callFunction<SendMessageResponse>("chatSend", {
       body: { message, history },
     });
   } catch (error) {
+    if (error instanceof ChatLimitError) throw error;
     if (error instanceof FunctionApiError && error.status === 403 && error.data?.limit_reached) {
       throw new ChatLimitError();
     }
     throw error;
   }
+};
+
+// Firestore Timestamp values expose .toDate() once resolved; a doc read back
+// immediately after a serverTimestamp() write can briefly have it as null
+// (pending server confirmation), so this falls back gracefully.
+const formatMessageTime = (value: unknown): string => {
+  const date = (value as { toDate?: () => Date } | null | undefined)?.toDate?.();
+  return date ? date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
 };
 
 export const getChatHistory = async (
@@ -121,7 +172,7 @@ export const getChatHistory = async (
   return {
     messages: snap.docs.map((item) => {
       const data = item.data();
-      return { role: data.role, text: data.text } as ChatMessage;
+      return { role: data.role, text: data.text, time: formatMessageTime(data.created_at) } as ChatMessage;
     }),
   };
 };

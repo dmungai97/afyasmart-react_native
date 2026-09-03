@@ -8,13 +8,28 @@ type FirebaseExtra = {
   mpesaApiBaseUrl?: string;
   functionsBaseUrl?: string;
   useFirebaseFunctions?: boolean;
+  useSupabaseFunctions?: boolean;
 };
 const extra = (Constants.expoConfig?.extra?.firebase ?? {}) as FirebaseExtra;
 
-const USE_FIREBASE_FUNCTIONS =
-  process.env.EXPO_PUBLIC_USE_FIREBASE_FUNCTIONS === "true" || extra.useFirebaseFunctions === true;
+// The Supabase mpesa Edge Function speaks the same "/mpesa/initiate" &
+// "/mpesa/status" request shape as the legacy Laravel backend below, and
+// already writes paymentRequests itself — so it reuses that same code path,
+// just with the client-side Firestore write skipped (see savePaymentRequest
+// call sites) since the server write is already authoritative there too.
+// Takes priority over useFirebaseFunctions: the Firebase mpesaInitiate/
+// mpesaStatus functions require the Blaze billing plan to even deploy, so
+// this app doesn't run them at all — see supabase/functions/mpesa.
+const USE_SUPABASE_FUNCTIONS =
+  process.env.EXPO_PUBLIC_USE_SUPABASE_FUNCTIONS === "true" || extra.useSupabaseFunctions === true;
 
-const mpesaApiBaseUrl = USE_FIREBASE_FUNCTIONS
+const USE_FIREBASE_FUNCTIONS =
+  !USE_SUPABASE_FUNCTIONS &&
+  (process.env.EXPO_PUBLIC_USE_FIREBASE_FUNCTIONS === "true" || extra.useFirebaseFunctions === true);
+
+const mpesaApiBaseUrl = USE_SUPABASE_FUNCTIONS
+  ? (process.env.EXPO_PUBLIC_SUPABASE_FUNCTIONS_BASE_URL ?? extra.mpesaApiBaseUrl ?? "https://afyasmart-ey9q.onrender.com/api/v1")
+  : USE_FIREBASE_FUNCTIONS
   ? (process.env.EXPO_PUBLIC_FUNCTIONS_BASE_URL ?? extra.functionsBaseUrl ?? "https://us-central1-afya-smart-377ad.cloudfunctions.net")
   : (process.env.EXPO_PUBLIC_MPESA_API_BASE_URL ?? extra.mpesaApiBaseUrl ?? "https://afyasmart-ey9q.onrender.com/api/v1");
 
@@ -25,8 +40,9 @@ const checkoutPlanKey = (checkoutRequestId: string) =>
   `mpesa_checkout_plan:${checkoutRequestId}`;
 
 // Only needed on the legacy Laravel path — Laravel never touches Firestore, so the
-// client has to log payment state itself. On the Firebase Functions path, mpesaInitiate/
-// mpesaStatus already write paymentRequests (and activate subscriptions) server-side.
+// client has to log payment state itself. On the Firebase Functions and Supabase
+// Edge Function paths, mpesaInitiate/mpesaStatus already write paymentRequests
+// (and activate subscriptions) server-side.
 const savePaymentRequest = async (
   checkoutRequestId: string,
   data: Record<string, unknown>,
@@ -50,7 +66,10 @@ const savePaymentRequest = async (
   }
 };
 
-const requestLaravelMpesa = async <T>(
+// Handles all three backends: Supabase and the legacy Laravel API both use
+// the "/mpesa/initiate" & "/mpesa/status" path shape as-is; only the Firebase
+// Functions backend needs its path remapped to "/mpesaInitiate"/"/mpesaStatus".
+const requestMpesaBackend = async <T>(
   path: string,
   body: Record<string, unknown>,
   token: string | null,
@@ -89,7 +108,7 @@ export const initiateMpesa = async (
   phone: string,
   plan: string,
 ): Promise<{ checkout_request_id: string }> => {
-  const data = await requestLaravelMpesa<{ checkout_request_id: string }>(
+  const data = await requestMpesaBackend<{ checkout_request_id: string }>(
     "/mpesa/initiate",
     { phone, plan },
     token,
@@ -99,7 +118,7 @@ export const initiateMpesa = async (
   await AsyncStorage.setItem(lastCheckoutKey, data.checkout_request_id);
   await AsyncStorage.setItem(checkoutPlanKey(data.checkout_request_id), plan);
 
-  if (!USE_FIREBASE_FUNCTIONS) {
+  if (!USE_FIREBASE_FUNCTIONS && !USE_SUPABASE_FUNCTIONS) {
     await savePaymentRequest(data.checkout_request_id, {
       phone,
       plan,
@@ -116,7 +135,7 @@ export const pollMpesaStatus = async (
   token: string | null,
   checkoutRequestId: string,
 ): Promise<{ paid: boolean; status: string; message?: string }> => {
-  const data = await requestLaravelMpesa<{ paid: boolean; status: string; message?: string }>(
+  const data = await requestMpesaBackend<{ paid: boolean; status: string; message?: string }>(
     "/mpesa/status",
     { checkout_request_id: checkoutRequestId },
     token,
@@ -140,7 +159,7 @@ export const pollMpesaStatus = async (
       await AsyncStorage.removeItem(lastCheckoutKey);
       await AsyncStorage.removeItem(checkoutPlanKey(checkoutRequestId));
     }
-  } else if (!USE_FIREBASE_FUNCTIONS) {
+  } else if (!USE_FIREBASE_FUNCTIONS && !USE_SUPABASE_FUNCTIONS) {
     await savePaymentRequest(checkoutRequestId, {
       status: data.status ?? "pending",
       paid: false,

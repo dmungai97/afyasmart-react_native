@@ -30,7 +30,7 @@ type AuthState = {
 };
 
 const clearPersistedAuth = async () => {
-  await AsyncStorage.multiRemove(["token", "user", "hasCompletedOnboarding"]);
+  await AsyncStorage.multiRemove(["token", "user", "hasCompletedOnboarding", "isNewUser"]);
 };
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -45,7 +45,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     const updatedUser = { ...user, onboarding_completed: hasOnboarded };
 
     await AsyncStorage.setItem("user", JSON.stringify(updatedUser));
-    if (hasOnboarded) await AsyncStorage.setItem("hasCompletedOnboarding", "true");
+    if (hasOnboarded) {
+      await AsyncStorage.setItem("hasCompletedOnboarding", "true");
+      await AsyncStorage.removeItem("isNewUser");
+    } else if (isNew) {
+      // Persisted (not just in-memory) so the "force this brand-new account
+      // through onboarding" gate in app/_layout.tsx survives the app being
+      // closed/killed before onboarding actually finishes.
+      await AsyncStorage.setItem("isNewUser", "true");
+    }
     set({
       token,
       user: updatedUser,
@@ -82,15 +90,19 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   loadAuth: async () => {
     try {
-      await AsyncStorage.removeItem("token");
+      // Firebase Auth's own SDK persists the real session — this store never
+      // writes a "token" key to AsyncStorage (the in-memory token here is
+      // always re-derived fresh via refreshUser()), so there's nothing to
+      // clear. token starts null below regardless.
       const raw = await AsyncStorage.getItem("user");
       const onboarded = await AsyncStorage.getItem("hasCompletedOnboarding");
+      const isNewUserStored = await AsyncStorage.getItem("isNewUser");
       const user: User | null = raw ? JSON.parse(raw) : null;
       set({
         token: null,
         user,
         hasCompletedOnboarding: onboarded === "true" || Boolean(user?.onboarding_completed),
-        isNewUser: false,
+        isNewUser: isNewUserStored === "true",
       });
     } catch {
       await clearPersistedAuth();
@@ -108,6 +120,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     const updated = current ? { ...current, onboarding_completed: true } : current;
 
     await AsyncStorage.setItem("hasCompletedOnboarding", "true");
+    await AsyncStorage.removeItem("isNewUser");
     if (updated) await AsyncStorage.setItem("user", JSON.stringify(updated));
     set({ user: updated, hasCompletedOnboarding: true, isNewUser: false });
 
@@ -147,12 +160,19 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const updatedUser = { ...user, onboarding_completed: hasOnboarded };
 
       await AsyncStorage.setItem("user", JSON.stringify(updatedUser));
-      if (hasOnboarded) await AsyncStorage.setItem("hasCompletedOnboarding", "true");
+      if (hasOnboarded) {
+        await AsyncStorage.setItem("hasCompletedOnboarding", "true");
+        await AsyncStorage.removeItem("isNewUser");
+      }
       set({
         user: updatedUser,
         token: freshToken ?? token,
         hasCompletedOnboarding: hasOnboarded,
-        isNewUser: false,
+        // Preserve rather than hardcode false — this runs on every app open
+        // with an active session, so hardcoding false here would immediately
+        // clobber the value loadAuth() just restored from AsyncStorage,
+        // undoing the "isNewUser survives a restart" fix above.
+        isNewUser: hasOnboarded ? false : get().isNewUser,
       });
     } catch (error) {
       console.error("Failed to refresh user", error);

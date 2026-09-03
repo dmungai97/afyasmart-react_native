@@ -1,4 +1,7 @@
+import { useEffect, useState } from 'react';
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { SymptomsAnalysisRequest } from '@/src/services/symptoms.service';
 
 export type DiagnosisCondition = {
@@ -83,13 +86,51 @@ export function buildDiagnosisFromSymptoms(symptoms: string): PendingDiagnosis {
   };
 }
 
-export const useDiagnosisStore = create<DiagnosisState>((set) => ({
-  pendingDiagnosis: null,
-  healthCheckAnswers: null,
-  pendingAnalysisRequest: null,
-  setPendingDiagnosis: (diagnosis) => set({ pendingDiagnosis: diagnosis }),
-  clearPendingDiagnosis: () => set({ pendingDiagnosis: null }),
-  setHealthCheckAnswers: (answers) => set({ healthCheckAnswers: answers }),
-  setPendingAnalysisRequest: (request) => set({ pendingAnalysisRequest: request }),
-  clearPendingAnalysisRequest: () => set({ pendingAnalysisRequest: null }),
-}));
+// Persisted (not just in-memory) because the onboarding funnel's own next
+// step after locked-results is backgrounding the app to approve an M-Pesa
+// STK push — exactly the kind of backgrounding event that can get the JS
+// process reclaimed on lower-end Android devices. Without persistence, that
+// silently drops the user's answers/diagnosis and screens fall back to
+// generic placeholder data instead of the user's actual results.
+export const useDiagnosisStore = create<DiagnosisState>()(
+  persist(
+    (set) => ({
+      pendingDiagnosis: null,
+      healthCheckAnswers: null,
+      pendingAnalysisRequest: null,
+      setPendingDiagnosis: (diagnosis) => set({ pendingDiagnosis: diagnosis }),
+      clearPendingDiagnosis: () => set({ pendingDiagnosis: null }),
+      setHealthCheckAnswers: (answers) => set({ healthCheckAnswers: answers }),
+      setPendingAnalysisRequest: (request) => set({ pendingAnalysisRequest: request }),
+      clearPendingAnalysisRequest: () => set({ pendingAnalysisRequest: null }),
+    }),
+    {
+      name: 'afyasmart-diagnosis',
+      storage: createJSONStorage(() => AsyncStorage),
+      partialize: (state) => ({
+        pendingDiagnosis: state.pendingDiagnosis,
+        healthCheckAnswers: state.healthCheckAnswers,
+        pendingAnalysisRequest: state.pendingAnalysisRequest,
+      }),
+    },
+  ),
+);
+
+// AsyncStorage reads are async, so there's a brief window on app start where
+// this store still holds its default (null) values before the persisted
+// blob loads. A screen that checks "is there a pending request?" during that
+// window would wrongly conclude there isn't one and navigate the user away.
+// Screens that make that check should wait for this to be true first.
+export function useDiagnosisHydrated(): boolean {
+  const [hydrated, setHydrated] = useState(() => useDiagnosisStore.persist.hasHydrated());
+
+  useEffect(() => {
+    if (useDiagnosisStore.persist.hasHydrated()) {
+      setHydrated(true);
+      return;
+    }
+    return useDiagnosisStore.persist.onFinishHydration(() => setHydrated(true));
+  }, []);
+
+  return hydrated;
+}

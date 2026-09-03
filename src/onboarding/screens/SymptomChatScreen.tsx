@@ -182,9 +182,31 @@ export function SymptomChatScreen() {
     }
   };
 
+  // A one- or two-word description ("sick", "not well") still reaches the AI
+  // analysis step and comes back looking like a confident, specific
+  // diagnosis — the model isn't trained to say "I don't have enough to go
+  // on." Catching it here, before it ever reaches the AI, is more reliable
+  // than hoping the model hedges appropriately on its own.
+  const MIN_SYMPTOM_WORDS = 3;
+
   const handleSendSymptom = () => {
     const text = input.trim();
     if (!text || stage !== 'symptom') return;
+
+    const wordCount = text.split(/\s+/).filter(Boolean).length;
+    if (wordCount < MIN_SYMPTOM_WORDS) {
+      setInput('');
+      setMessages((prev) => [
+        ...prev,
+        { role: 'user', text },
+        {
+          role: 'assistant',
+          text: "Could you tell me a bit more? For example, where it hurts, what it feels like, or when it started — a few more details helps me give you a more useful analysis.",
+        },
+      ]);
+      // Stage stays 'symptom' — input remains open for another attempt.
+      return;
+    }
 
     setInput('');
     setSymptomText(text);
@@ -259,7 +281,12 @@ export function SymptomChatScreen() {
   return (
     <KeyboardAvoidingView
       style={styles.root}
-      behavior="padding"
+      // See ChatScreen.tsx for why this is Android-only: app.json's
+      // android.softwareKeyboardLayoutMode: "resize" already makes the OS
+      // shrink the window on Android, and stacking KeyboardAvoidingView's
+      // own padding on top of that is what caused the keyboard/input
+      // inconsistency across Android devices. iOS and web still need it.
+      behavior={Platform.OS === 'android' ? undefined : 'padding'}
       keyboardVerticalOffset={0}
     >
       <StatusBar barStyle="light-content" backgroundColor={INK} />
@@ -388,10 +415,16 @@ export function SymptomChatScreen() {
           onSubmitEditing={handleSendSymptom}
           returnKeyType="send"
           onFocus={() => {
-            setKeyboardShown(true);
+            // Web has no real virtual keyboard — DOM focus fires here on
+            // every platform, but only iOS/Android should treat it as "the
+            // keyboard is now covering part of the screen". See
+            // ChatScreen.tsx for the same fix and why it's needed.
+            if (Platform.OS !== 'web') setKeyboardShown(true);
             scrollToBottom();
           }}
-          onBlur={() => setKeyboardShown(false)}
+          onBlur={() => {
+            if (Platform.OS !== 'web') setKeyboardShown(false);
+          }}
         />
         <TouchableOpacity
           style={[styles.sendBtn, (stage !== 'symptom' || !input.trim() || sending) && styles.sendBtnDisabled]}
