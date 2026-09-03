@@ -2,6 +2,7 @@
   "expo": {
     "name": "AfyaSmart",
     "slug": "afyasmart",
+    "version": "1.0.1",
     "scheme": "afyasmart",
     "icon": "./assets/images/icon.png",
     "userInterfaceStyle": "light",

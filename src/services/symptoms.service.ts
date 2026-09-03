@@ -54,16 +54,15 @@ const extra = (Constants.expoConfig?.extra?.firebase ?? {}) as FirebaseExtra;
 const USE_SUPABASE_FUNCTIONS =
   process.env.EXPO_PUBLIC_USE_SUPABASE_FUNCTIONS === "true" || extra.useSupabaseFunctions === true;
 
-// Toggle this flag to switch between the legacy Laravel API and Firebase Cloud Functions
+// Defaults to the Supabase Edge Function path unless Firebase Cloud Functions
+// are explicitly selected (they need the Blaze plan to deploy).
 const USE_FIREBASE_FUNCTIONS =
   !USE_SUPABASE_FUNCTIONS &&
   (process.env.EXPO_PUBLIC_USE_FIREBASE_FUNCTIONS === "true" || extra.useFirebaseFunctions === true);
 
-const symptomsApiBaseUrl = USE_SUPABASE_FUNCTIONS
-  ? (process.env.EXPO_PUBLIC_SUPABASE_FUNCTIONS_BASE_URL ?? extra.mpesaApiBaseUrl ?? "https://afyasmart-ey9q.onrender.com/api/v1")
-  : USE_FIREBASE_FUNCTIONS
+const symptomsApiBaseUrl = USE_FIREBASE_FUNCTIONS
   ? (process.env.EXPO_PUBLIC_FUNCTIONS_BASE_URL ?? extra.functionsBaseUrl ?? "https://us-central1-afya-smart-377ad.cloudfunctions.net")
-  : (process.env.EXPO_PUBLIC_MPESA_API_BASE_URL ?? extra.mpesaApiBaseUrl ?? "https://afyasmart-ey9q.onrender.com/api/v1");
+  : (process.env.EXPO_PUBLIC_SUPABASE_FUNCTIONS_BASE_URL ?? extra.mpesaApiBaseUrl ?? "");
 
 // Onboarding lets users check symptoms before creating an account, so these
 // endpoints identify the caller by a locally persisted guest id rather than

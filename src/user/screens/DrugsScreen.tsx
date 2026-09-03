@@ -113,7 +113,7 @@ export function DrugsScreen() {
     setSource(null);
 
     try {
-      // 1️⃣ Try local Laravel API first
+      // 1️⃣ Try our Firestore drug catalog first
       const data = await searchDrugs(q.trim(), token!);
       const local: Drug[] = (data.data ?? []).map((d: Drug) => ({ ...d, _source: 'local' as const }));
 
@@ -127,7 +127,7 @@ export function DrugsScreen() {
         setSource(fdaResults.length > 0 ? 'fda' : null);
       }
     } catch {
-      // Local API failed — try OpenFDA directly
+      // Firestore lookup failed — try OpenFDA directly
       const fdaResults = await searchOpenFDA(q.trim());
       setResults(fdaResults);
       setSource(fdaResults.length > 0 ? 'fda' : null);
